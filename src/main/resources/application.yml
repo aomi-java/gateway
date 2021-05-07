@@ -1,0 +1,31 @@
+server:
+  port: 80
+
+
+spring:
+  autoconfigure:
+    exclude:
+      # 排除 JDBC 自动配置 如有需要,需要自行开启
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      # 排除 MongoDB 自动配置 如有需要,需要自行开启
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+
+  cloud:
+    gateway:
+      routes:
+        - id: hello_bing
+          uri: http://api-prexfb.easipay.net/v1
+          predicates:
+            - Path=/v1/**
+          filters:
+            - "Sign=tech.aomi.cloud.gateway.filter.sign.KeyServiceImpl"
+
+logging:
+  level:
+    org:
+      springframework: error
+    tech:
+      aomi: debug
+  pattern:
+    console: "%clr(%d){blue} [%clr(%-5level){lightgreen}] [%logger{0}] - %msg%n"
+    file: "%d [%-5level] [%logger{0}] - %msg%n"
