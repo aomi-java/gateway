@@ -4,21 +4,22 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;
+import org.springframework.boot.web.reactive.error.ErrorAttributes;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
-import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.cloud.gateway.filter.factory.rewrite.CachedBodyOutputMessage;
-import org.springframework.cloud.gateway.filter.factory.rewrite.ModifyRequestBodyGatewayFilterFactory;
 import org.springframework.cloud.gateway.support.BodyInserterContext;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ReactiveHttpOutputMessage;
 import org.springframework.http.codec.HttpMessageReader;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpRequestDecorator;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserter;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.server.HandlerStrategies;
@@ -26,10 +27,11 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import tech.aomi.cloud.gateway.sign.SignService;
+import tech.aomi.common.exception.ServiceException;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * @author Sean createAt 2021/5/7
@@ -38,7 +40,7 @@ import java.util.Objects;
 @Component
 public class SignGatewayFilterFactory extends AbstractGatewayFilterFactory<SignGatewayFilterFactory.Config> implements ApplicationContextAware {
 
-    private static final String KEY = "keyServiceBeanName";
+    private static final String KEY = "signServiceBeanName";
 
     private ApplicationContext applicationContext;
 
@@ -47,7 +49,6 @@ public class SignGatewayFilterFactory extends AbstractGatewayFilterFactory<SignG
 
     public SignGatewayFilterFactory() {
         super(Config.class);
-        ModifyRequestBodyGatewayFilterFactory a;
         this.messageReaders = HandlerStrategies.withDefaults().messageReaders();
 
     }
@@ -65,17 +66,33 @@ public class SignGatewayFilterFactory extends AbstractGatewayFilterFactory<SignG
     @Override
     public GatewayFilter apply(SignGatewayFilterFactory.Config config) {
         return (exchange, chain) -> {
+            exchange.getAttributes().put(Common.NEED_SIGN, true);
+            exchange.getAttributes().put(Common.SIGN_SERVICE_BEAN_NAME, config.getSignServiceBeanName());
+
+            ServerHttpRequest request = exchange.getRequest();
+
+            if (request.getMethod() == HttpMethod.GET) {
+                verify(config.getSignServiceBeanName(), request, null);
+                return chain.filter(exchange.mutate().build());
+            }
+
             ServerRequest serverRequest = ServerRequest.create(exchange, messageReaders);
             // TODO: flux or mono
-            Mono<String> modifiedBody = serverRequest.bodyToMono(String.class)
+            Mono<byte[]> modifiedBody = serverRequest.bodyToMono(byte[].class)
                     .flatMap(body -> {
-                        LOGGER.debug("请求参数: [{}]", body);
+                        try {
+                            verify(config.getSignServiceBeanName(), exchange.getRequest(), body);
+                        } catch (Exception e) {
+                            LOGGER.error("签名校验失败: {}", e.getMessage(), e);
+                            return Mono.error(e);
+                        }
                         return Mono.just(body);
                     });
 
 
-            BodyInserter<Mono<String>, ReactiveHttpOutputMessage> bodyInserter = BodyInserters.fromPublisher(modifiedBody, String.class);
+            BodyInserter<Mono<byte[]>, ReactiveHttpOutputMessage> bodyInserter = BodyInserters.fromPublisher(modifiedBody, byte[].class);
             HttpHeaders headers = new HttpHeaders();
+            headers.add(Common.NEED_SIGN, "true");
             headers.putAll(exchange.getRequest().getHeaders());
 
             // the new content type will be computed by bodyInserter
@@ -86,9 +103,7 @@ public class SignGatewayFilterFactory extends AbstractGatewayFilterFactory<SignG
 
             return bodyInserter.insert(outputMessage, new BodyInserterContext()).then(Mono.defer(() -> {
                 ServerHttpRequest decorator = decorate(exchange, headers, outputMessage);
-                return chain.filter(exchange.mutate().request(decorator).build()).then(Mono.fromRunnable(() -> {
-                    LOGGER.debug("请求处理完成");
-                }));
+                return chain.filter(exchange.mutate().request(decorator).build());
             }));
         };
     }
@@ -98,8 +113,19 @@ public class SignGatewayFilterFactory extends AbstractGatewayFilterFactory<SignG
         this.applicationContext = applicationContext;
     }
 
-    private void verify(String body) {
-
+    private void verify(String signServiceBeanName, ServerHttpRequest request, byte[] body) throws ServiceException {
+        if (!StringUtils.hasLength(signServiceBeanName)) {
+            LOGGER.warn("没有配置SignService实例Bean名称,无法进行签名验证,请提供tech.aomi.cloud.gateway.sign.SignService实现");
+            throw new ServiceException("没有配置SignService实例");
+        }
+//        try {
+//            SignService signService = applicationContext.getBean(signServiceBeanName, SignService.class);
+//            signService.verify(request, body);
+//        } catch (ServiceException e) {
+//            throw e;
+//        } catch (Throwable t) {
+//            throw new ServiceException(t.getMessage(), t);
+//        }
     }
 
     private ServerHttpRequestDecorator decorate(ServerWebExchange exchange, HttpHeaders headers, CachedBodyOutputMessage outputMessage) {
@@ -131,7 +157,7 @@ public class SignGatewayFilterFactory extends AbstractGatewayFilterFactory<SignG
     @Setter
     public static class Config {
 
-        private String keyServiceBeanName;
+        private String signServiceBeanName;
 
     }
 }
