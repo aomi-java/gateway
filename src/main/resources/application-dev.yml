@@ -13,12 +13,12 @@ spring:
   cloud:
     gateway:
       routes:
-        - id: hello_bing
-          uri: http://api-prexfb.easipay.net/v1
+        - id: hello_github
+          uri: https://api.github.com
           predicates:
             - Path=/v1/**
           filters:
-            - "Sign=tech.aomi.cloud.gateway.filter.sign.KeyServiceImpl"
+            - "Sign"
 
 logging:
   level:
