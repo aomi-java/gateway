@@ -10,8 +10,10 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ReactiveHttpOutputMessage;
 import org.springframework.http.codec.HttpMessageReader;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.http.server.reactive.ServerHttpResponseDecorator;
 import org.springframework.web.reactive.function.BodyInserter;
 import org.springframework.web.reactive.function.BodyInserters;
@@ -20,7 +22,9 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-import tech.aomi.cloud.gateway.sign.SignService;
+import tech.aomi.cloud.gateway.api.MessageService;
+import tech.aomi.cloud.gateway.controller.ResponseMessage;
+import tech.aomi.common.web.controller.Result;
 
 import java.util.List;
 import java.util.Map;
@@ -34,7 +38,7 @@ import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.O
  * @author Sean createAt 2021/5/9
  */
 @Slf4j
-public class ResponseSignServerHttpResponse extends ServerHttpResponseDecorator {
+public class MessageServiceServerHttpResponse extends ServerHttpResponseDecorator {
 
     private final List<HttpMessageReader<?>> messageReaders;
 
@@ -44,17 +48,17 @@ public class ResponseSignServerHttpResponse extends ServerHttpResponseDecorator 
 
     private final ServerWebExchange exchange;
 
-    private final SignService signService;
+    private final MessageService messageService;
 
-    public ResponseSignServerHttpResponse(
-            SignService signService,
+    public MessageServiceServerHttpResponse(
+            MessageService messageService,
             ServerWebExchange exchange,
             List<HttpMessageReader<?>> messageReaders,
             Set<MessageBodyDecoder> messageBodyDecoders,
             Set<MessageBodyEncoder> messageBodyEncoders
     ) {
         super(exchange.getResponse());
-        this.signService = signService;
+        this.messageService = messageService;
         this.exchange = exchange;
         this.messageReaders = messageReaders;
 
@@ -65,6 +69,14 @@ public class ResponseSignServerHttpResponse extends ServerHttpResponseDecorator 
 
     @Override
     public Mono<Void> writeWith(Publisher<? extends DataBuffer> body) {
+
+        ServerHttpResponse response = exchange.getResponse();
+        HttpStatus httpStatus = response.getStatusCode();
+
+        if (null == httpStatus || !httpStatus.is2xxSuccessful() || httpStatus.is3xxRedirection()) {
+            return super.writeWith(body);
+        }
+
         String originalResponseContentType = exchange.getAttribute(ORIGINAL_RESPONSE_CONTENT_TYPE_ATTR);
 
         HttpHeaders httpHeaders = new HttpHeaders();
@@ -77,20 +89,24 @@ public class ResponseSignServerHttpResponse extends ServerHttpResponseDecorator 
         ClientResponse clientResponse = prepareClientResponse(body, httpHeaders);
 
         // TODO: flux or mono
-        Mono<byte[]> modifiedBody = extractBody(clientResponse, byte[].class)
+        Mono<ResponseMessage> modifiedBody = extractBody(clientResponse, Result.Entity.class)
                 .flatMap(originalBody -> {
+                    MessageContext messageContext = exchange.getAttribute(MessageContext.MESSAGE_CONTEXT);
+
                     try {
-                        return Mono.just(signService.sign(this, originalBody));
+                        ResponseMessage message = messageService.modifyResponseBody(this, messageContext, originalBody);
+                        messageService.sign(this, messageContext, message);
+                        return Mono.just(message);
                     } catch (Exception e) {
-                        LOGGER.error("响应结果签名失败: {}", e.getMessage(), e);
+                        LOGGER.error("响应结果处理失败: {}", e.getMessage(), e);
                         return Mono.error(e);
                     }
                 });
 
-        BodyInserter<Mono<byte[]>, ReactiveHttpOutputMessage> bodyInserter = BodyInserters.fromPublisher(modifiedBody, byte[].class);
+        BodyInserter<Mono<ResponseMessage>, ReactiveHttpOutputMessage> bodyInserter = BodyInserters.fromPublisher(modifiedBody, ResponseMessage.class);
         CachedBodyOutputMessage outputMessage = new CachedBodyOutputMessage(exchange, getHeaders());
         return bodyInserter.insert(outputMessage, new BodyInserterContext()).then(Mono.defer(() -> {
-            Mono<DataBuffer> messageBody = writeBody(outputMessage, byte[].class);
+            Mono<DataBuffer> messageBody = writeBody(outputMessage, ResponseMessage.class);
             HttpHeaders headers = getHeaders();
             if (!headers.containsKey(HttpHeaders.TRANSFER_ENCODING) || headers.containsKey(HttpHeaders.CONTENT_LENGTH)) {
                 messageBody = messageBody.doOnNext(data -> headers.setContentLength(data.readableByteCount()));

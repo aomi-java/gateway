@@ -19,7 +19,7 @@
 响应结果签名成功后，如果签名值在body中,修改原始body,返回即可。如果是放在请求头中,直接通过response设置响应头即可.
 
 ```java
-package tech.aomi.cloud.gateway.sign;
+package tech.aomi.cloud.gateway.service;
 
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;

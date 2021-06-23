@@ -22,16 +22,19 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import tech.aomi.cloud.gateway.sign.SignService;
+import tech.aomi.cloud.gateway.api.MessageService;
+import tech.aomi.cloud.gateway.controller.RequestMessage;
 
 import java.util.List;
 import java.util.Set;
 
 /**
+ * 报文服务网关过滤器
+ *
  * @author Sean createAt 2021/5/10
  */
 @Slf4j
-public class SignGatewayFilter implements GatewayFilter, Ordered {
+public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
 
     private final List<HttpMessageReader<?>> messageReaders;
 
@@ -39,15 +42,15 @@ public class SignGatewayFilter implements GatewayFilter, Ordered {
 
     private final Set<MessageBodyEncoder> messageBodyEncoders;
 
-    private final SignService signService;
+    private final MessageService messageService;
 
-    public SignGatewayFilter(
-            SignService signService,
+    public MessageServiceGatewayFilter(
+            MessageService messageService,
             List<HttpMessageReader<?>> messageReaders,
             Set<MessageBodyDecoder> messageBodyDecoders,
             Set<MessageBodyEncoder> messageBodyEncoders
     ) {
-        this.signService = signService;
+        this.messageService = messageService;
         this.messageReaders = messageReaders;
         this.messageBodyDecoders = messageBodyDecoders;
         this.messageBodyEncoders = messageBodyEncoders;
@@ -55,11 +58,14 @@ public class SignGatewayFilter implements GatewayFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        MessageContext context = new MessageContext();
+        exchange.getAttributes().put(MessageContext.MESSAGE_CONTEXT, context);
+
         ServerHttpRequest request = exchange.getRequest();
 
         if (request.getMethod() == HttpMethod.GET) {
             try {
-                signService.verify(request, null);
+//                signService.verify(request, null);
             } catch (Exception e) {
                 LOGGER.error("签名校验失败: {}", e.getMessage(), e);
                 return Mono.error(e);
@@ -67,8 +73,8 @@ public class SignGatewayFilter implements GatewayFilter, Ordered {
             return chain.filter(
                     exchange.mutate()
                             .request(request)
-                            .response(new ResponseSignServerHttpResponse(
-                                    signService,
+                            .response(new MessageServiceServerHttpResponse(
+                                    messageService,
                                     exchange,
                                     messageReaders,
                                     messageBodyDecoders,
@@ -80,15 +86,17 @@ public class SignGatewayFilter implements GatewayFilter, Ordered {
 
         ServerRequest serverRequest = ServerRequest.create(exchange, messageReaders);
         // TODO: flux or mono
-        Mono<byte[]> modifiedBody = serverRequest.bodyToMono(byte[].class)
+        Mono<byte[]> modifiedBody = serverRequest.bodyToMono(RequestMessage.class)
                 .flatMap(body -> {
                     try {
-                        signService.verify(request, null);
+                        messageService.verify(request, body);
                     } catch (Exception e) {
-                        LOGGER.error("签名校验失败: {}", e.getMessage(), e);
+                        LOGGER.error("签名验证失败: {}", e.getMessage());
                         return Mono.error(e);
                     }
-                    return Mono.just(body);
+                    context.setRequestMessage(body);
+                    byte[] newBody = messageService.modifyRequestBody(request, context);
+                    return Mono.just(newBody);
                 });
 
 
@@ -107,8 +115,8 @@ public class SignGatewayFilter implements GatewayFilter, Ordered {
             return chain.filter(
                     exchange.mutate()
                             .request(decorator)
-                            .response(new ResponseSignServerHttpResponse(
-                                    signService,
+                            .response(new MessageServiceServerHttpResponse(
+                                    messageService,
                                     exchange,
                                     messageReaders,
                                     messageBodyDecoders,
