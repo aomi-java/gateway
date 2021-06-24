@@ -16,13 +16,20 @@ import tech.aomi.common.web.controller.Result;
 public interface MessageService {
 
     /**
+     * 初始化报文上下文
+     * 1. 参数校验
+     * 2. 初始化数据
+     */
+    void init(MessageContext context, RequestMessage body);
+
+    /**
      * 请求参数签名验证
      *
      * @param request http request
-     * @param body    请求body参数
+     * @param context 报文上下文
      * @throws ServiceException 签名出现任何异常则认为签名验证失败
      */
-    void verify(ServerHttpRequest request, RequestMessage body) throws ServiceException;
+    void verify(ServerHttpRequest request, MessageContext context) throws ServiceException;
 
     /**
      * 修改原始请求数据为后端应用需要的数据

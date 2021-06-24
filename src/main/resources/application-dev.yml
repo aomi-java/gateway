@@ -11,12 +11,19 @@ spring:
   cloud:
     gateway:
       routes:
-        - id: hello_github
-          uri: https://api-xfb.easipay.net/v2
+        - id: v2
+          uri: https://api-xfb.easipay.net/v1
+          predicates:
+            - Path=/v2/**
+          filters:
+            - "MessageService"
+            - RewritePath=/v2(?<segment>/?.*), /v1$\{segment}
+        - id: v1
+          uri: https://api-xfb.easipay.net/v1
           predicates:
             - Path=/v1/**
           filters:
-            - "MessageService"
+            - "Sign"
 
 logging:
   level:

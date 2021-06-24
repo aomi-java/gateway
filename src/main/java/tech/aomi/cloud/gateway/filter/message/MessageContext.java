@@ -3,6 +3,7 @@ package tech.aomi.cloud.gateway.filter.message;
 import lombok.Getter;
 import lombok.Setter;
 import tech.aomi.cloud.gateway.controller.RequestMessage;
+import tech.aomi.cloud.gateway.entity.Client;
 
 /**
  * 请求报文上下文
@@ -24,6 +25,11 @@ public class MessageContext {
      * 请求参数明文
      */
     private byte[] payload;
+
+    /**
+     * 客户端信息
+     */
+    private Client client;
 
     private RequestMessage requestMessage;
 }

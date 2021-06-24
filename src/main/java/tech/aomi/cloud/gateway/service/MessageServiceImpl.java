@@ -7,11 +7,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Service;
-import tech.aomi.cloud.gateway.GatewayProperties;
-import tech.aomi.cloud.gateway.api.KeyService;
+import tech.aomi.cloud.gateway.api.ClientService;
 import tech.aomi.cloud.gateway.api.MessageService;
 import tech.aomi.cloud.gateway.controller.RequestMessage;
 import tech.aomi.cloud.gateway.controller.ResponseMessage;
+import tech.aomi.cloud.gateway.entity.Client;
 import tech.aomi.cloud.gateway.filter.message.MessageContext;
 import tech.aomi.common.constant.Common;
 import tech.aomi.common.exception.ErrorCode;
@@ -40,14 +40,10 @@ import java.util.UUID;
 public class MessageServiceImpl implements MessageService {
 
     @Autowired
-    private KeyService keyService;
-
-    @Autowired
-    private GatewayProperties properties;
+    private ClientService clientService;
 
     @Override
-    public void verify(ServerHttpRequest request, RequestMessage body) throws ServiceException {
-        LOGGER.debug("请求参数签名验证: {}", body);
+    public void init(MessageContext context, RequestMessage body) {
         if (StringUtils.isAnyEmpty(
                 body.getClientId(),
                 body.getTrk(),
@@ -59,6 +55,26 @@ public class MessageServiceImpl implements MessageService {
             e.setErrorCode(ErrorCode.PARAMS_ERROR);
             throw e;
         }
+
+        Client client = clientService.getClient(body.getClientId());
+        if (null == client) {
+            LOGGER.error("客户端没有配置秘钥相关信息: {}", body.getClientId());
+            throw new ServiceException("客户端没有配置秘钥相关信息: " + body.getClientId());
+        }
+
+        if (StringUtils.isEmpty(client.getClientPublicKey())) {
+            LOGGER.error("客户端没有配置公钥: {}, {}", client.getId(), client.getCode());
+            throw new ServiceException("客户端公钥未配置: " + client.getCode());
+        }
+
+        context.setClient(client);
+        context.setRequestMessage(body);
+    }
+
+    @Override
+    public void verify(ServerHttpRequest request, MessageContext context) throws ServiceException {
+        RequestMessage body = context.getRequestMessage();
+        LOGGER.debug("请求参数签名验证: {}", body);
         String signDataStr = body.getTimestamp() + body.getRandomString() + StringUtils.trimToEmpty(body.getPayload());
         LOGGER.debug("请求验签数据: [{}], 客户端计算的签名: [{}]", signDataStr, body.getSign());
         byte[] signData = signDataStr.getBytes();
@@ -66,7 +82,7 @@ public class MessageServiceImpl implements MessageService {
 
         switch (body.getSignType()) {
             case RSA:
-                rsaSignVerify(body, signData, signBytes);
+                rsaSignVerify(context.getClient(), body, signData, signBytes);
                 break;
         }
 
@@ -74,11 +90,12 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     public byte[] modifyRequestBody(ServerHttpRequest request, MessageContext context) {
+        Client client = context.getClient();
         RequestMessage message = context.getRequestMessage();
         LOGGER.debug("解密传输秘钥: {}", message.getTrk());
         byte[] trk;
         try {
-            trk = RSAUtil.privateKeyDecryptWithBase64(properties.getPrivateKey(), message.getTrk());
+            trk = RSAUtil.privateKeyDecryptWithBase64(client.getPrivateKey(), message.getTrk());
             context.setTrk(trk);
         } catch (Exception e) {
             LOGGER.error("解密传输秘钥失败: {}", e.getMessage(), e);
@@ -136,9 +153,11 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private String rsaSign(MessageContext context, byte[] signData) {
+        Client client = context.getClient();
+        String privateKeyStr = client.getPrivateKey();
         PrivateKey privateKey = null;
         try {
-            privateKey = RSA.parsePrivateKeyWithBase64(properties.getPrivateKey());
+            privateKey = RSA.parsePrivateKeyWithBase64(privateKeyStr);
         } catch (Exception e) {
             LOGGER.error("解析服务端私钥失败: {}", e.getMessage(), e);
             throw new ServiceException("解析服务端私钥失败", e);
@@ -164,8 +183,8 @@ public class MessageServiceImpl implements MessageService {
      * @param signData  验签数据
      * @param signBytes 客户端计算的签名
      */
-    private void rsaSignVerify(RequestMessage body, byte[] signData, byte[] signBytes) {
-        String publicKeyStr = keyService.getPublicKey(body.getClientId());
+    private void rsaSignVerify(Client client, RequestMessage body, byte[] signData, byte[] signBytes) {
+        String publicKeyStr = client.getClientPublicKey();
         if (StringUtils.isEmpty(publicKeyStr)) {
             LOGGER.error("获取客户端公钥失败: {}", body.getClientId());
             throw new SignatureException("获取客户端公钥失败:" + body.getClientId());

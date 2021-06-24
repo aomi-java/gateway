@@ -71,9 +71,9 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
 
         if (request.getMethod() == HttpMethod.GET) {
             RequestMessage body = new RequestMessage(request.getQueryParams());
-            context.setRequestMessage(body);
+            messageService.init(context, body);
             try {
-                messageService.verify(request, body);
+                messageService.verify(request, context);
             } catch (Exception e) {
                 LOGGER.error("签名校验失败: {}", e.getMessage());
                 return Mono.error(e);
@@ -112,8 +112,9 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
         // TODO: flux or mono
         Mono<byte[]> modifiedBody = serverRequest.bodyToMono(RequestMessage.class)
                 .flatMap(body -> {
+                    messageService.init(context, body);
                     try {
-                        messageService.verify(request, body);
+                        messageService.verify(request, context);
                     } catch (Exception e) {
                         LOGGER.error("签名验证失败: {}", e.getMessage());
                         return Mono.error(e);
