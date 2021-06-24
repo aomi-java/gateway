@@ -4,7 +4,7 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import tech.aomi.cloud.gateway.controller.RequestMessage;
 import tech.aomi.cloud.gateway.controller.ResponseMessage;
-import tech.aomi.cloud.gateway.filter.sign.MessageContext;
+import tech.aomi.cloud.gateway.filter.message.MessageContext;
 import tech.aomi.common.exception.ServiceException;
 import tech.aomi.common.web.controller.Result;
 

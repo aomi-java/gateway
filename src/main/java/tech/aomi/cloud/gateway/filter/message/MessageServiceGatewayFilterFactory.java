@@ -1,4 +1,4 @@
-package tech.aomi.cloud.gateway.filter.sign;
+package tech.aomi.cloud.gateway.filter.message;
 
 import lombok.Getter;
 import lombok.Setter;

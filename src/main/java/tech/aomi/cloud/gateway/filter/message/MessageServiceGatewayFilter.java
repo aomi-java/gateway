@@ -1,4 +1,4 @@
-package tech.aomi.cloud.gateway.filter.sign;
+package tech.aomi.cloud.gateway.filter.message;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
@@ -64,8 +64,10 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
 
         if (request.getMethod() == HttpMethod.GET) {
+            RequestMessage body = new RequestMessage(request.getQueryParams());
+            context.setRequestMessage(body);
             try {
-//                signService.verify(request, null);
+                messageService.verify(request, body);
             } catch (Exception e) {
                 LOGGER.error("签名校验失败: {}", e.getMessage(), e);
                 return Mono.error(e);

@@ -12,7 +12,7 @@ import tech.aomi.cloud.gateway.api.KeyService;
 import tech.aomi.cloud.gateway.api.MessageService;
 import tech.aomi.cloud.gateway.controller.RequestMessage;
 import tech.aomi.cloud.gateway.controller.ResponseMessage;
-import tech.aomi.cloud.gateway.filter.sign.MessageContext;
+import tech.aomi.cloud.gateway.filter.message.MessageContext;
 import tech.aomi.common.constant.Common;
 import tech.aomi.common.exception.ErrorCode;
 import tech.aomi.common.exception.ServiceException;
@@ -55,7 +55,7 @@ public class MessageServiceImpl implements MessageService {
                 body.getRandomString(),
                 body.getSign())) {
 
-            ServiceException e = new ServiceException("请求参数不正确,必填参数有NULL值");
+            ServiceException e = new ServiceException("请求参数不正确,必填参数有NULL值. 请检查: clientId、trk、timestamp、randomString、sign是否已经正确填写");
             e.setErrorCode(ErrorCode.PARAMS_ERROR);
             throw e;
         }

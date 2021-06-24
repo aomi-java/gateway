@@ -40,7 +40,7 @@ public class GlobalErrorWebExceptionHandler extends DefaultErrorWebExceptionHand
         if (t instanceof ServiceException) {
             se = (ServiceException) t;
         } else if (t instanceof IllegalArgumentException) {
-            se = new ServiceException(t);
+            se = new ServiceException(t.getMessage(), t);
             se.setErrorCode(ErrorCode.PARAMS_ERROR);
         } else {
             se = new ServiceException(t);
