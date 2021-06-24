@@ -6,6 +6,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.springframework.util.MultiValueMap;
 
+import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
@@ -77,14 +78,22 @@ public class RequestMessage implements java.io.Serializable {
     private String sign;
 
     public RequestMessage(MultiValueMap<String, String> args) {
-        Optional.ofNullable(args.getFirst("requestId")).ifPresent(requestId -> this.requestId = requestId);
-        Optional.ofNullable(args.getFirst("clientId")).ifPresent(clientId -> this.clientId = clientId);
-        Optional.ofNullable(args.getFirst("trk")).ifPresent(trk -> this.trk = trk);
-        Optional.ofNullable(args.getFirst("timestamp")).ifPresent(timestamp -> this.timestamp = timestamp);
-        Optional.ofNullable(args.getFirst("randomString")).ifPresent(randomString -> this.randomString = randomString);
-        Optional.ofNullable(args.getFirst("payload")).ifPresent(payload -> this.payload = payload);
         Optional.ofNullable(args.getFirst("charset")).ifPresent(charset -> this.charset = Charset.forName(charset));
+        Optional.ofNullable(args.getFirst("requestId")).ifPresent(requestId -> this.requestId = urlDecode(requestId));
+        Optional.ofNullable(args.getFirst("clientId")).ifPresent(clientId -> this.clientId = urlDecode(clientId));
+        Optional.ofNullable(args.getFirst("trk")).ifPresent(trk -> this.trk = urlDecode(trk));
+        Optional.ofNullable(args.getFirst("timestamp")).ifPresent(timestamp -> this.timestamp = urlDecode(timestamp));
+        Optional.ofNullable(args.getFirst("randomString")).ifPresent(randomString -> this.randomString = urlDecode(randomString));
+        Optional.ofNullable(args.getFirst("payload")).ifPresent(payload -> this.payload = urlDecode(payload));
         Optional.ofNullable(args.getFirst("signType")).ifPresent(signType -> this.signType = SignType.valueOf(signType));
-        Optional.ofNullable(args.getFirst("sign")).ifPresent(sign -> this.sign = sign);
+        Optional.ofNullable(args.getFirst("sign")).ifPresent(sign -> this.sign = urlDecode(sign));
+    }
+
+    private String urlDecode(String value) {
+        try {
+            return URLDecoder.decode(value, Optional.ofNullable(getCharset()).orElse(StandardCharsets.UTF_8).name());
+        } catch (Exception ignored) {
+        }
+        return value;
     }
 }

@@ -93,7 +93,7 @@ public class MessageServiceImpl implements MessageService {
             LOGGER.info("明文为空,不需要解密");
             return new byte[0];
         }
-        byte[] payload = aes(false, trk, payloadCiphertext.getBytes(StandardCharsets.UTF_8));
+        byte[] payload = aes(false, trk, Base64.getDecoder().decode(payloadCiphertext));
         context.setPayload(payload);
         return payload;
     }
@@ -145,7 +145,11 @@ public class MessageServiceImpl implements MessageService {
         }
 
         try {
-            byte[] signArr = RSAUtil.sign(privateKey, RSAUtil.SIGN_ALGORITHMS_SHA512, signData);
+            byte[] signArr = RSAUtil.sign(
+                    privateKey,
+                    tech.aomi.cloud.gateway.constant.Common.RSA_SIGN_ALGORITHM,
+                    signData
+            );
             return Base64.getEncoder().encodeToString(signArr);
         } catch (Exception e) {
             LOGGER.error("响应参数计算签名失败: {}", e.getMessage(), e);
@@ -175,21 +179,27 @@ public class MessageServiceImpl implements MessageService {
         }
 
         try {
-            boolean isOk = RSAUtil.signVerify(publicKey, RSAUtil.SIGN_ALGORITHMS_SHA512, signData, signBytes);
+            boolean isOk = RSAUtil.signVerify(
+                    publicKey,
+                    tech.aomi.cloud.gateway.constant.Common.RSA_SIGN_ALGORITHM,
+                    signData,
+                    signBytes
+            );
             if (isOk) {
                 LOGGER.debug("签名校验通过: RequestId: {}", body.getRequestId());
                 return;
             }
             LOGGER.error("签名错误:{}", body.getSign());
+            throw new SignatureException("签名错误");
         } catch (Exception e) {
             LOGGER.error("签名执行失败: {}", e.getMessage());
-            throw new SignatureException("签名校验失败:" + e.getMessage(), e);
+            throw new SignatureException("签名校验异常:" + e.getMessage(), e);
         }
     }
 
     private byte[] aes(boolean encrypt, byte[] key, byte[] data) {
-        AesUtils.setTransformation(AesUtils.AES_CBC_PKCS5Padding);
-        AesUtils.setKeyLength(256);
+        AesUtils.setTransformation(tech.aomi.cloud.gateway.constant.Common.AES_TRANSFORMATION);
+        AesUtils.setKeyLength(tech.aomi.cloud.gateway.constant.Common.AES_KEY_LENGTH);
         try {
             if (encrypt) {
                 return AesUtils.encrypt(key, data);

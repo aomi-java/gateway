@@ -1,6 +1,8 @@
 package tech.aomi.cloud.gateway.filter.message;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.NettyWriteResponseFilter;
@@ -20,12 +22,16 @@ import org.springframework.web.reactive.function.BodyInserter;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tech.aomi.cloud.gateway.api.MessageService;
 import tech.aomi.cloud.gateway.controller.RequestMessage;
+import tech.aomi.common.utils.json.Json;
 
+import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -69,12 +75,28 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
             try {
                 messageService.verify(request, body);
             } catch (Exception e) {
-                LOGGER.error("签名校验失败: {}", e.getMessage(), e);
+                LOGGER.error("签名校验失败: {}", e.getMessage());
                 return Mono.error(e);
             }
+            byte[] newBody = messageService.modifyRequestBody(request, context);
+            String newBodyStr = new String(newBody, body.getCharset());
+
+            ServerHttpRequest newRequest = request;
+
+            if (StringUtils.isNotEmpty(newBodyStr)) {
+                URI uri = exchange.getRequest().getURI();
+
+                UriComponentsBuilder builder = UriComponentsBuilder.fromUri(uri).replaceQuery(null);
+                Map<String, String> urlArgs = Json.fromJson(newBodyStr, new TypeReference<Map<String, String>>() {
+                });
+                urlArgs.forEach(builder::queryParam);
+                URI newUri = builder.build(true).toUri();
+                newRequest = request.mutate().uri(newUri).build();
+            }
+
             return chain.filter(
                     exchange.mutate()
-                            .request(request)
+                            .request(newRequest)
                             .response(new MessageServiceServerHttpResponse(
                                     messageService,
                                     exchange,
