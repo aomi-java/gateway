@@ -12,13 +12,4 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "gateway")
 public class GatewayProperties {
 
-    /**
-     * 服务端公钥
-     */
-    private String publicKey;
-    /**
-     * 服务端私钥
-     */
-    private String privateKey;
-
 }
