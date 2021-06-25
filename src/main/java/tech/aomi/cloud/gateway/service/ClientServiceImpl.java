@@ -1,37 +1,79 @@
 package tech.aomi.cloud.gateway.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import tech.aomi.cloud.gateway.api.ClientService;
+import tech.aomi.cloud.gateway.constant.CacheKey;
+import tech.aomi.cloud.gateway.dto.CreateClientDto;
+import tech.aomi.cloud.gateway.dto.UpdateClientDto;
 import tech.aomi.cloud.gateway.entity.Client;
+import tech.aomi.cloud.gateway.repository.ClientRepository;
+import tech.aomi.common.exception.ResourceNonExistException;
 
 /**
  * @author Sean createAt 2021/6/23
  */
 @Slf4j
 @Service
+@CacheConfig(cacheNames = CacheKey.CLIENT)
 public class ClientServiceImpl implements ClientService {
 
-    /**
-     * MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAylGKjhqXjh8tKD2yTqBXnBzQBJShyFJhfo9lnl3OySLM4zAJ64gZHA8dLw6tJFtxL3aVE605PGN/TB9ghtWUMCkLFva+6IoyokiAIMkJcSpspXOLzNuIPVotQb5JJ7DeL2pqIR/INKcDgUmmVfh3iR0dLCVOznmew1ooUnaf+p55emFnS5ebKWKuhps1H2eldGWwKNoQweqJuk8G1WxnfZqRgCTW/mQ9umKX2kkv92hPWoTppeaRFwqAe2OMP/O0RrmMwV7l24LcvSjNazCY2JK36dW7ALX/2h7oWR7L6i93UxQgwb0Zze7Rm880XHYz/U9DGoGcbXhRy7kLh10KQQIDAQAB
-     * MIIEwAIBADANBgkqhkiG9w0BAQEFAASCBKowggSmAgEAAoIBAQDKUYqOGpeOHy0oPbJOoFecHNAElKHIUmF+j2WeXc7JIszjMAnriBkcDx0vDq0kW3EvdpUTrTk8Y39MH2CG1ZQwKQsW9r7oijKiSIAgyQlxKmylc4vM24g9Wi1BvkknsN4vamohH8g0pwOBSaZV+HeJHR0sJU7OeZ7DWihSdp/6nnl6YWdLl5spYq6GmzUfZ6V0ZbAo2hDB6om6TwbVbGd9mpGAJNb+ZD26YpfaSS/3aE9ahOml5pEXCoB7Y4w/87RGuYzBXuXbgty9KM1rMJjYkrfp1bsAtf/aHuhZHsvqL3dTFCDBvRnN7tGbzzRcdjP9T0MagZxteFHLuQuHXQpBAgMBAAECggEBAMRw0fhSR48+JClrZkLDmu1AaJXZ/w+zNWieMQvIh6xx9sAsd6VSmxbMcgir1l9zzf1IxUy6p9VDwmkWGjIxFFaCs3rTj9/Xt3wsqwOqT1mq2Jz5COeazLjNYx3vdbZtG/6r82pAIrNE6rlQ2omk2+Os+hNQEimWmxmQ44/WEFVUaFrTw4yJR+B3lE1ZqpobCr4pEJT01Ds9pDAI/Cl7uGMwfd7bmUJ+sU9wFEjZtZE/UNcQQgqTxb4WgCU7ZDRFrvZIqCx5buACLZR0FtQGEksXg43/x2PMEhLvlcv0XShoi6fIKFdeTgDGbnd+YFrK9TpVOmxVN0tkTBRwZrslVcECgYEA+SPP4GaX6QS6bTKVfMb21XkqzoKvxlQFW56NDP034iiQzc3jGaRm6pvZbQDecEVgcd8C22vJMKZbmBTl3/hjKkjVMdgyKlwi7vKBAcoZVmvPfxFLkkT91uMKWO14EtuWHG/6Mpz8JAN4VAUVQsS0L9Ubkpjx56Ew/Fkn56ZdYRkCgYEAz+Ovaa2DaNX44vBxhcCUSuCWA1ea5U0UXnaHkHAwbQVo9kwNhxyzyauq5NYJol4Pyk6WBpJfpLhjsxmLI/SFVn4ZyaY6eUvRoWpFpskYvynbDl9LiuC1q5YOq+nrLtlyi1HNAz8ZJfmQLlGJyL7zCYnqmnUZbfMCqHf53jaVz2kCgYEAsHKDlEs0xWx62EGeC7wiLvhcr9twwAbbsJKvFQb1oC/YtlldwNhlpzzvlTqrT1pjPuKR9HL3D4SSlDggwin5mYXxsBaNGOEeQJrxcSIAJeu/DiBipFpGaP1tY6PziW+JdeR8j4INNThb7S2YbCxB7SqCF6ZIlSLdPaurDm4N7mkCgYEAi2AY4H7mFUkvXebaFVQxl6nOqVr4jDcLKvHInXu5272+yzHd9/G0T8b6AgXF28e4Smg5iRplaSf+H7tGX8q2AnD0lQ8PMPc2CkQXgmRcZP2I0a/uE6Pn6KvoFjXz6Sr78o/bJQwOrjkNAyDDgYUTqBeA5CER9XbxF0WojeSGt9ECgYEAzl8d3PKMOly74bqd0eoQNnLUWrgAYV2w9kNCtWkETtRz82j0CVSkbFTOsMTuhGW0gj0AUTGCZjDyNGEOTnLYggIRUOTSkGjlv21+rM5xtYRAg5slec2VuNYdnlByquKwXXiHpH5mNstkiE9jWVdH+aNwq5GEOQ5OrmD/O/CQtlE=
-     *
-     * @param clientId 客户端ID
-     * @return
-     */
+    @Autowired
+    private ClientRepository clientRepository;
+
     @Override
+    @Cacheable(key = "#clientId", unless = "#result == null")
     public Client getClient(String clientId) {
-        Client client = new Client();
-        client.setClientPublicKey("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAylGKjhqXjh8tKD2yTqBXnBzQBJShyFJhfo9lnl3OySLM4zAJ64gZHA8dLw6tJFtxL3aVE605PGN/TB9ghtWUMCkLFva+6IoyokiAIMkJcSpspXOLzNuIPVotQb5JJ7DeL2pqIR/INKcDgUmmVfh3iR0dLCVOznmew1ooUnaf+p55emFnS5ebKWKuhps1H2eldGWwKNoQweqJuk8G1WxnfZqRgCTW/mQ9umKX2kkv92hPWoTppeaRFwqAe2OMP/O0RrmMwV7l24LcvSjNazCY2JK36dW7ALX/2h7oWR7L6i93UxQgwb0Zze7Rm880XHYz/U9DGoGcbXhRy7kLh10KQQIDAQAB");
-        client.setPrivateKey("MIIEwAIBADANBgkqhkiG9w0BAQEFAASCBKowggSmAgEAAoIBAQDKUYqOGpeOHy0oPbJOoFecHNAElKHIUmF+j2WeXc7JIszjMAnriBkcDx0vDq0kW3EvdpUTrTk8Y39MH2CG1ZQwKQsW9r7oijKiSIAgyQlxKmylc4vM24g9Wi1BvkknsN4vamohH8g0pwOBSaZV+HeJHR0sJU7OeZ7DWihSdp/6nnl6YWdLl5spYq6GmzUfZ6V0ZbAo2hDB6om6TwbVbGd9mpGAJNb+ZD26YpfaSS/3aE9ahOml5pEXCoB7Y4w/87RGuYzBXuXbgty9KM1rMJjYkrfp1bsAtf/aHuhZHsvqL3dTFCDBvRnN7tGbzzRcdjP9T0MagZxteFHLuQuHXQpBAgMBAAECggEBAMRw0fhSR48+JClrZkLDmu1AaJXZ/w+zNWieMQvIh6xx9sAsd6VSmxbMcgir1l9zzf1IxUy6p9VDwmkWGjIxFFaCs3rTj9/Xt3wsqwOqT1mq2Jz5COeazLjNYx3vdbZtG/6r82pAIrNE6rlQ2omk2+Os+hNQEimWmxmQ44/WEFVUaFrTw4yJR+B3lE1ZqpobCr4pEJT01Ds9pDAI/Cl7uGMwfd7bmUJ+sU9wFEjZtZE/UNcQQgqTxb4WgCU7ZDRFrvZIqCx5buACLZR0FtQGEksXg43/x2PMEhLvlcv0XShoi6fIKFdeTgDGbnd+YFrK9TpVOmxVN0tkTBRwZrslVcECgYEA+SPP4GaX6QS6bTKVfMb21XkqzoKvxlQFW56NDP034iiQzc3jGaRm6pvZbQDecEVgcd8C22vJMKZbmBTl3/hjKkjVMdgyKlwi7vKBAcoZVmvPfxFLkkT91uMKWO14EtuWHG/6Mpz8JAN4VAUVQsS0L9Ubkpjx56Ew/Fkn56ZdYRkCgYEAz+Ovaa2DaNX44vBxhcCUSuCWA1ea5U0UXnaHkHAwbQVo9kwNhxyzyauq5NYJol4Pyk6WBpJfpLhjsxmLI/SFVn4ZyaY6eUvRoWpFpskYvynbDl9LiuC1q5YOq+nrLtlyi1HNAz8ZJfmQLlGJyL7zCYnqmnUZbfMCqHf53jaVz2kCgYEAsHKDlEs0xWx62EGeC7wiLvhcr9twwAbbsJKvFQb1oC/YtlldwNhlpzzvlTqrT1pjPuKR9HL3D4SSlDggwin5mYXxsBaNGOEeQJrxcSIAJeu/DiBipFpGaP1tY6PziW+JdeR8j4INNThb7S2YbCxB7SqCF6ZIlSLdPaurDm4N7mkCgYEAi2AY4H7mFUkvXebaFVQxl6nOqVr4jDcLKvHInXu5272+yzHd9/G0T8b6AgXF28e4Smg5iRplaSf+H7tGX8q2AnD0lQ8PMPc2CkQXgmRcZP2I0a/uE6Pn6KvoFjXz6Sr78o/bJQwOrjkNAyDDgYUTqBeA5CER9XbxF0WojeSGt9ECgYEAzl8d3PKMOly74bqd0eoQNnLUWrgAYV2w9kNCtWkETtRz82j0CVSkbFTOsMTuhGW0gj0AUTGCZjDyNGEOTnLYggIRUOTSkGjlv21+rM5xtYRAg5slec2VuNYdnlByquKwXXiHpH5mNstkiE9jWVdH+aNwq5GEOQ5OrmD/O/CQtlE=");
-        return client;
+        return clientRepository.findById(clientId).orElse(null);
     }
 
     @Override
+    @Cacheable(key = "#result.id", unless = "#result == null")
     public Client getClientByCode(String code) {
+        return clientRepository.findByCode(code);
+    }
+
+    @Override
+    public Client save(CreateClientDto dto) {
         Client client = new Client();
-        client.setClientPublicKey("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAk8i4h04/P3gt5jC07GDmpCvezSkbZ4eRNK6ltXLEurRpWMjwk0g3PIUEdBa7r5BpZRAfpuuXz6hgc3WeeBqKoRUq7YCcvuRRXuI3qt5r1d6d8vPJnH1RGyGlKpssNMR3CP2pwgNnkt9ySZUhHLJF7SsFuZ4Q/qlXAsoDxwl0+diK1vo5hWevIQPemCARc9m5XdWfNkXiFGm2uhufb5m0vS3bgLMEruxwfLmZKqCgH0nLPISVp5f5ZnBOiFgb0uzFnO9IxTJXTjX5OacwkywPT39zvWLFMP5X1MAh8jduRHggIQ8fuRpHDvuUwOm5Lv/6v6iQcUNpK/3fuB/zw6MJWQIDAQAB");
-        client.setPrivateKey("MIIEwAIBADANBgkqhkiG9w0BAQEFAASCBKowggSmAgEAAoIBAQDKUYqOGpeOHy0oPbJOoFecHNAElKHIUmF+j2WeXc7JIszjMAnriBkcDx0vDq0kW3EvdpUTrTk8Y39MH2CG1ZQwKQsW9r7oijKiSIAgyQlxKmylc4vM24g9Wi1BvkknsN4vamohH8g0pwOBSaZV+HeJHR0sJU7OeZ7DWihSdp/6nnl6YWdLl5spYq6GmzUfZ6V0ZbAo2hDB6om6TwbVbGd9mpGAJNb+ZD26YpfaSS/3aE9ahOml5pEXCoB7Y4w/87RGuYzBXuXbgty9KM1rMJjYkrfp1bsAtf/aHuhZHsvqL3dTFCDBvRnN7tGbzzRcdjP9T0MagZxteFHLuQuHXQpBAgMBAAECggEBAMRw0fhSR48+JClrZkLDmu1AaJXZ/w+zNWieMQvIh6xx9sAsd6VSmxbMcgir1l9zzf1IxUy6p9VDwmkWGjIxFFaCs3rTj9/Xt3wsqwOqT1mq2Jz5COeazLjNYx3vdbZtG/6r82pAIrNE6rlQ2omk2+Os+hNQEimWmxmQ44/WEFVUaFrTw4yJR+B3lE1ZqpobCr4pEJT01Ds9pDAI/Cl7uGMwfd7bmUJ+sU9wFEjZtZE/UNcQQgqTxb4WgCU7ZDRFrvZIqCx5buACLZR0FtQGEksXg43/x2PMEhLvlcv0XShoi6fIKFdeTgDGbnd+YFrK9TpVOmxVN0tkTBRwZrslVcECgYEA+SPP4GaX6QS6bTKVfMb21XkqzoKvxlQFW56NDP034iiQzc3jGaRm6pvZbQDecEVgcd8C22vJMKZbmBTl3/hjKkjVMdgyKlwi7vKBAcoZVmvPfxFLkkT91uMKWO14EtuWHG/6Mpz8JAN4VAUVQsS0L9Ubkpjx56Ew/Fkn56ZdYRkCgYEAz+Ovaa2DaNX44vBxhcCUSuCWA1ea5U0UXnaHkHAwbQVo9kwNhxyzyauq5NYJol4Pyk6WBpJfpLhjsxmLI/SFVn4ZyaY6eUvRoWpFpskYvynbDl9LiuC1q5YOq+nrLtlyi1HNAz8ZJfmQLlGJyL7zCYnqmnUZbfMCqHf53jaVz2kCgYEAsHKDlEs0xWx62EGeC7wiLvhcr9twwAbbsJKvFQb1oC/YtlldwNhlpzzvlTqrT1pjPuKR9HL3D4SSlDggwin5mYXxsBaNGOEeQJrxcSIAJeu/DiBipFpGaP1tY6PziW+JdeR8j4INNThb7S2YbCxB7SqCF6ZIlSLdPaurDm4N7mkCgYEAi2AY4H7mFUkvXebaFVQxl6nOqVr4jDcLKvHInXu5272+yzHd9/G0T8b6AgXF28e4Smg5iRplaSf+H7tGX8q2AnD0lQ8PMPc2CkQXgmRcZP2I0a/uE6Pn6KvoFjXz6Sr78o/bJQwOrjkNAyDDgYUTqBeA5CER9XbxF0WojeSGt9ECgYEAzl8d3PKMOly74bqd0eoQNnLUWrgAYV2w9kNCtWkETtRz82j0CVSkbFTOsMTuhGW0gj0AUTGCZjDyNGEOTnLYggIRUOTSkGjlv21+rM5xtYRAg5slec2VuNYdnlByquKwXXiHpH5mNstkiE9jWVdH+aNwq5GEOQ5OrmD/O/CQtlE=");
-        return client;
+        client.setCode(dto.getCode());
+        client.setName(dto.getName());
+        client.setRequestHeaders(dto.getRequestHeaders());
+        client.setResponseHeaders(dto.getResponseHeaders());
+        client.setClientPublicKey(dto.getClientPublicKey());
+        client.setPublicKey(dto.getPublicKey());
+        client.setPrivateKey(dto.getPrivateKey());
+        client.setPlatform(dto.getPlatform());
+        return clientRepository.save(client);
+    }
+
+    @Override
+    @CacheEvict(key = "#result.id")
+    public Client update(UpdateClientDto dto) {
+        if (StringUtils.isEmpty(dto.getId()) && StringUtils.isEmpty(dto.getCode())) {
+            throw new IllegalArgumentException("ID 或者 Code 必填其一");
+        }
+
+        Client client = null;
+        if (StringUtils.isNotEmpty(dto.getId())) {
+            client = clientRepository.findById(dto.getId()).orElse(null);
+        } else if (StringUtils.isNotEmpty(dto.getCode())) {
+            client = clientRepository.findByCode(dto.getCode());
+        }
+        if (null == client) {
+            throw new ResourceNonExistException("客户端不存在");
+        }
+        client.setName(dto.getName());
+        client.setRequestHeaders(dto.getRequestHeaders());
+        client.setResponseHeaders(dto.getResponseHeaders());
+        client.setClientPublicKey(dto.getClientPublicKey());
+        client.setPublicKey(dto.getPublicKey());
+        client.setPrivateKey(dto.getPrivateKey());
+        return clientRepository.save(client);
     }
 }

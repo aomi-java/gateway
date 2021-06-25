@@ -1,5 +1,7 @@
 package tech.aomi.cloud.gateway.api;
 
+import tech.aomi.cloud.gateway.dto.CreateClientDto;
+import tech.aomi.cloud.gateway.dto.UpdateClientDto;
 import tech.aomi.cloud.gateway.entity.Client;
 
 /**
@@ -25,4 +27,7 @@ public interface ClientService {
      */
     Client getClientByCode(String code);
 
+    Client save(CreateClientDto dto);
+
+    Client update(UpdateClientDto dto);
 }
