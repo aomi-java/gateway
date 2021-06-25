@@ -24,6 +24,8 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tech.aomi.cloud.gateway.api.ClientService;
+import tech.aomi.cloud.gateway.constant.Header;
+import tech.aomi.cloud.gateway.constant.MessageVersion;
 import tech.aomi.cloud.gateway.entity.Client;
 import tech.aomi.common.constant.Common;
 import tech.aomi.common.constant.HttpHeader;
@@ -123,6 +125,7 @@ public class SignGatewayFilter implements GatewayFilter, Ordered {
         BodyInserter<Mono<byte[]>, ReactiveHttpOutputMessage> bodyInserter = BodyInserters.fromPublisher(modifiedBody, byte[].class);
         HttpHeaders headers = new HttpHeaders();
         headers.putAll(exchange.getRequest().getHeaders());
+        headers.add(Header.MESSAGE_VERSION, MessageVersion.V1_0_0.getVersion());
 
         // the new content type will be computed by bodyInserter
         // and then set in the request decorator
@@ -166,7 +169,7 @@ public class SignGatewayFilter implements GatewayFilter, Ordered {
         }
         return chain.filter(
                 exchange.mutate()
-                        .request(request)
+                        .request(request.mutate().header(Header.MESSAGE_VERSION, MessageVersion.V1_0_0.getVersion()).build())
                         .response(new SignServerHttpResponse(
                                 exchange,
                                 messageReaders,
