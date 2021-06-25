@@ -8,6 +8,7 @@ import org.springframework.boot.web.error.ErrorAttributeOptions;
 import org.springframework.boot.web.reactive.error.ErrorAttributes;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.reactive.function.server.ServerRequest;
+import org.springframework.web.server.ResponseStatusException;
 import tech.aomi.cloud.gateway.controller.ResponseMessage;
 import tech.aomi.common.exception.ErrorCode;
 import tech.aomi.common.exception.ServiceException;
@@ -33,6 +34,9 @@ public class GlobalErrorWebExceptionHandler extends DefaultErrorWebExceptionHand
     protected Map<String, Object> getErrorAttributes(ServerRequest request, ErrorAttributeOptions options) {
         Throwable t = getError(request);
         LOGGER.error("请求处理异常: {}", request.exchange().getRequest().getURI(), t);
+        if (t instanceof ResponseStatusException) {
+            return super.getErrorAttributes(request, options);
+        }
 
         ResponseMessage responseMessage = new ResponseMessage();
         responseMessage.setSuccess(false);
@@ -57,6 +61,7 @@ public class GlobalErrorWebExceptionHandler extends DefaultErrorWebExceptionHand
 
         Map<String, Object> resultMap = responseMessage.toMap();
         resultMap.put("code", result.getStatusCode().value());
+        resultMap.put("GlobalErrorWebExceptionHandler", true);
         return resultMap;
     }
 
@@ -67,6 +72,9 @@ public class GlobalErrorWebExceptionHandler extends DefaultErrorWebExceptionHand
      */
     @Override
     protected int getHttpStatus(Map<String, Object> errorAttributes) {
+        if (null == errorAttributes.remove("GlobalErrorWebExceptionHandler")) {
+            return super.getHttpStatus(errorAttributes);
+        }
         return (int) errorAttributes.remove("code");
     }
 
