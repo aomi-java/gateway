@@ -1,7 +1,7 @@
 package tech.aomi.cloud.gateway.api;
 
-import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.server.ServerWebExchange;
 import tech.aomi.cloud.gateway.controller.RequestMessage;
 import tech.aomi.cloud.gateway.controller.ResponseMessage;
 import tech.aomi.cloud.gateway.filter.message.MessageContext;
@@ -22,6 +22,10 @@ public interface MessageService {
      */
     void init(MessageContext context, RequestMessage body);
 
+    HttpHeaders getRequestHeaders(MessageContext context);
+
+    HttpHeaders getResponseHeaders(MessageContext context);
+
     /**
      * 请求参数签名验证
      *
@@ -29,7 +33,7 @@ public interface MessageService {
      * @param context 报文上下文
      * @throws ServiceException 签名出现任何异常则认为签名验证失败
      */
-    void verify(ServerHttpRequest request, MessageContext context) throws ServiceException;
+    void verify(ServerWebExchange exchange, MessageContext context) throws ServiceException;
 
     /**
      * 修改原始请求数据为后端应用需要的数据
@@ -40,7 +44,7 @@ public interface MessageService {
      * @param context 报文上下文
      * @return 后端服务需要的数据
      */
-    byte[] modifyRequestBody(ServerHttpRequest request, MessageContext context);
+    byte[] modifyRequestBody(ServerWebExchange exchange, MessageContext context);
 
     /**
      * 转换原始响应的数据为标准响应格式的数据
@@ -49,7 +53,7 @@ public interface MessageService {
      * @param context  报文上下文
      * @return 响应给客户端的数据
      */
-    ResponseMessage modifyResponseBody(ServerHttpResponse response, MessageContext context, Result.Entity body);
+    ResponseMessage modifyResponseBody(ServerWebExchange exchange, MessageContext context, Result.Entity body);
 
     /**
      * 响应数据进行签名
@@ -58,7 +62,7 @@ public interface MessageService {
      * @param context      报文上下文
      * @param responseBody 响应参数
      */
-    void sign(ServerHttpResponse response, MessageContext context, ResponseMessage responseBody);
+    void sign(ServerWebExchange exchange, MessageContext context, ResponseMessage responseBody);
 
 
 }

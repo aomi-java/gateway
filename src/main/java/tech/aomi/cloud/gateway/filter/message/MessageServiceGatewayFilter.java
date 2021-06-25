@@ -70,42 +70,7 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
 
         if (request.getMethod() == HttpMethod.GET) {
-            RequestMessage body = new RequestMessage(request.getQueryParams());
-            messageService.init(context, body);
-            try {
-                messageService.verify(request, context);
-            } catch (Exception e) {
-                LOGGER.error("签名校验失败: {}", e.getMessage());
-                return Mono.error(e);
-            }
-            byte[] newBody = messageService.modifyRequestBody(request, context);
-            String newBodyStr = new String(newBody, body.getCharset());
-
-            ServerHttpRequest newRequest = request;
-
-            if (StringUtils.isNotEmpty(newBodyStr)) {
-                URI uri = exchange.getRequest().getURI();
-
-                UriComponentsBuilder builder = UriComponentsBuilder.fromUri(uri).replaceQuery(null);
-                Map<String, String> urlArgs = Json.fromJson(newBodyStr, new TypeReference<Map<String, String>>() {
-                });
-                urlArgs.forEach(builder::queryParam);
-                URI newUri = builder.build(true).toUri();
-                newRequest = request.mutate().uri(newUri).build();
-            }
-
-            return chain.filter(
-                    exchange.mutate()
-                            .request(newRequest)
-                            .response(new MessageServiceServerHttpResponse(
-                                    messageService,
-                                    exchange,
-                                    messageReaders,
-                                    messageBodyDecoders,
-                                    messageBodyEncoders
-                            ))
-                            .build()
-            );
+            return get(exchange, chain, context);
         }
 
         ServerRequest serverRequest = ServerRequest.create(exchange, messageReaders);
@@ -114,19 +79,19 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
                 .flatMap(body -> {
                     messageService.init(context, body);
                     try {
-                        messageService.verify(request, context);
+                        messageService.verify(exchange, context);
                     } catch (Exception e) {
                         LOGGER.error("签名验证失败: {}", e.getMessage());
                         return Mono.error(e);
                     }
                     context.setRequestMessage(body);
-                    byte[] newBody = messageService.modifyRequestBody(request, context);
+                    byte[] newBody = messageService.modifyRequestBody(exchange, context);
                     return Mono.just(newBody);
                 });
 
 
         BodyInserter<Mono<byte[]>, ReactiveHttpOutputMessage> bodyInserter = BodyInserters.fromPublisher(modifiedBody, byte[].class);
-        HttpHeaders headers = new HttpHeaders();
+        HttpHeaders headers = messageService.getRequestHeaders(context);
         headers.putAll(exchange.getRequest().getHeaders());
 
         // the new content type will be computed by bodyInserter
@@ -155,6 +120,49 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
     @Override
     public int getOrder() {
         return NettyWriteResponseFilter.WRITE_RESPONSE_FILTER_ORDER - 1;
+    }
+
+
+    private Mono<Void> get(ServerWebExchange exchange, GatewayFilterChain chain, MessageContext context) {
+        ServerHttpRequest request = exchange.getRequest();
+        RequestMessage body = new RequestMessage(request.getQueryParams());
+        messageService.init(context, body);
+
+        ServerHttpRequest.Builder requestBuilder = request.mutate();
+        requestBuilder.headers(httpHeaders -> httpHeaders.putAll(messageService.getRequestHeaders(context)));
+
+        try {
+            messageService.verify(exchange, context);
+        } catch (Exception e) {
+            LOGGER.error("签名校验失败: {}", e.getMessage());
+            return Mono.error(e);
+        }
+        byte[] newBody = messageService.modifyRequestBody(exchange, context);
+        String newBodyStr = new String(newBody, body.getCharset());
+
+        if (StringUtils.isNotEmpty(newBodyStr)) {
+            URI uri = exchange.getRequest().getURI();
+
+            UriComponentsBuilder builder = UriComponentsBuilder.fromUri(uri).replaceQuery(null);
+            Map<String, String> urlArgs = Json.fromJson(newBodyStr, new TypeReference<Map<String, String>>() {
+            });
+            urlArgs.forEach(builder::queryParam);
+            URI newUri = builder.build(true).toUri();
+            requestBuilder.uri(newUri);
+        }
+
+        return chain.filter(
+                exchange.mutate()
+                        .request(requestBuilder.build())
+                        .response(new MessageServiceServerHttpResponse(
+                                messageService,
+                                exchange,
+                                messageReaders,
+                                messageBodyDecoders,
+                                messageBodyEncoders
+                        ))
+                        .build()
+        );
     }
 
     private ServerHttpRequestDecorator decorate(ServerWebExchange exchange, HttpHeaders headers, CachedBodyOutputMessage outputMessage) {

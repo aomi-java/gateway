@@ -22,4 +22,5 @@ public class Common {
      * RSA 签名算法
      */
     public static final String RSA_SIGN_ALGORITHM = RSAUtil.SIGN_ALGORITHMS_SHA512;
+
 }

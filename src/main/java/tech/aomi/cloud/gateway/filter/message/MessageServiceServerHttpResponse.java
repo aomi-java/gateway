@@ -77,6 +77,8 @@ public class MessageServiceServerHttpResponse extends ServerHttpResponseDecorato
             return super.writeWith(body);
         }
 
+        MessageContext messageContext = exchange.getAttribute(MessageContext.MESSAGE_CONTEXT);
+
         String originalResponseContentType = exchange.getAttribute(ORIGINAL_RESPONSE_CONTENT_TYPE_ATTR);
 
         HttpHeaders httpHeaders = new HttpHeaders();
@@ -91,11 +93,9 @@ public class MessageServiceServerHttpResponse extends ServerHttpResponseDecorato
         // TODO: flux or mono
         Mono<ResponseMessage> modifiedBody = extractBody(clientResponse, Result.Entity.class)
                 .flatMap(originalBody -> {
-                    MessageContext messageContext = exchange.getAttribute(MessageContext.MESSAGE_CONTEXT);
-
                     try {
-                        ResponseMessage message = messageService.modifyResponseBody(this, messageContext, originalBody);
-                        messageService.sign(this, messageContext, message);
+                        ResponseMessage message = messageService.modifyResponseBody(exchange, messageContext, originalBody);
+                        messageService.sign(exchange, messageContext, message);
                         return Mono.just(message);
                     } catch (Exception e) {
                         LOGGER.error("响应结果处理失败: {}", e.getMessage(), e);
@@ -104,7 +104,11 @@ public class MessageServiceServerHttpResponse extends ServerHttpResponseDecorato
                 });
 
         BodyInserter<Mono<ResponseMessage>, ReactiveHttpOutputMessage> bodyInserter = BodyInserters.fromPublisher(modifiedBody, ResponseMessage.class);
-        CachedBodyOutputMessage outputMessage = new CachedBodyOutputMessage(exchange, getHeaders());
+
+        httpHeaders = getHeaders();
+        httpHeaders.addAll(messageService.getResponseHeaders(messageContext));
+
+        CachedBodyOutputMessage outputMessage = new CachedBodyOutputMessage(exchange, httpHeaders);
         return bodyInserter.insert(outputMessage, new BodyInserterContext()).then(Mono.defer(() -> {
             Mono<DataBuffer> messageBody = writeBody(outputMessage, ResponseMessage.class);
             HttpHeaders headers = getHeaders();

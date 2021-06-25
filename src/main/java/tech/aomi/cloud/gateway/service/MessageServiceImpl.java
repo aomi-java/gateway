@@ -4,11 +4,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.server.ServerWebExchange;
 import tech.aomi.cloud.gateway.api.ClientService;
 import tech.aomi.cloud.gateway.api.MessageService;
+import tech.aomi.cloud.gateway.constant.Header;
+import tech.aomi.cloud.gateway.constant.MessageVersion;
 import tech.aomi.cloud.gateway.controller.RequestMessage;
 import tech.aomi.cloud.gateway.controller.ResponseMessage;
 import tech.aomi.cloud.gateway.entity.Client;
@@ -72,7 +75,27 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    public void verify(ServerHttpRequest request, MessageContext context) throws ServiceException {
+    public HttpHeaders getRequestHeaders(MessageContext context) {
+        HttpHeaders headers = new HttpHeaders();
+        setCommonHeader(headers);
+        if (!CollectionUtils.isEmpty(context.getClient().getRequestHeaders())) {
+            context.getClient().getRequestHeaders().forEach(headers::add);
+        }
+        return headers;
+    }
+
+    @Override
+    public HttpHeaders getResponseHeaders(MessageContext context) {
+        HttpHeaders headers = new HttpHeaders();
+        setCommonHeader(headers);
+        if (!CollectionUtils.isEmpty(context.getClient().getResponseHeaders())) {
+            context.getClient().getResponseHeaders().forEach(headers::add);
+        }
+        return headers;
+    }
+
+    @Override
+    public void verify(ServerWebExchange exchange, MessageContext context) throws ServiceException {
         RequestMessage body = context.getRequestMessage();
         LOGGER.debug("请求参数签名验证: {}", body);
         String signDataStr = body.getTimestamp() + body.getRandomString() + StringUtils.trimToEmpty(body.getPayload());
@@ -89,7 +112,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    public byte[] modifyRequestBody(ServerHttpRequest request, MessageContext context) {
+    public byte[] modifyRequestBody(ServerWebExchange exchange, MessageContext context) {
         Client client = context.getClient();
         RequestMessage message = context.getRequestMessage();
         LOGGER.debug("解密传输秘钥: {}", message.getTrk());
@@ -116,7 +139,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    public ResponseMessage modifyResponseBody(ServerHttpResponse response, MessageContext context, Result.Entity body) {
+    public ResponseMessage modifyResponseBody(ServerWebExchange exchange, MessageContext context, Result.Entity body) {
         ResponseMessage message = new ResponseMessage();
         message.setTimestamp(DateFormatUtils.format(new Date(), Common.DATETIME_FORMAT));
         message.setRandomString(UUID.randomUUID().toString().replaceAll("-", ""));
@@ -135,7 +158,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    public void sign(ServerHttpResponse response, MessageContext context, ResponseMessage body) {
+    public void sign(ServerWebExchange exchange, MessageContext context, ResponseMessage body) {
         LOGGER.debug("响应参数签名计算: {}", body);
         body.setSignType(context.getRequestMessage().getSignType());
 
@@ -231,5 +254,9 @@ public class MessageServiceImpl implements MessageService {
             se.setErrorCode(ErrorCode.PARAMS_ERROR);
             throw se;
         }
+    }
+
+    private void setCommonHeader(HttpHeaders headers) {
+        headers.add(Header.MESSAGE_VERSION, MessageVersion.LATEST.getVersion());
     }
 }

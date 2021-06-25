@@ -51,6 +51,11 @@ public class Client implements java.io.Serializable {
     private String privateKey;
 
     /**
+     * 所属平台
+     */
+    private String platform;
+
+    /**
      * 创建时间
      */
     private Date createAt;
