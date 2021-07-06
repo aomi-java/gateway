@@ -1,0 +1,51 @@
+kubernetes:
+  namespace: gateway
+
+server:
+  #undertow:
+  #threads:
+  # 阻塞任务线程池, 当执行类似servlet请求阻塞操作, undertow会从这个线程池中取得线程,它的值设置取决于系统的负载.默认值是IO线程数*8
+  #io: 8
+  #worker: 64
+  # 以下的配置会影响buffer,这些buffer会用于服务器连接的IO操作,有点类似netty的池化内存管理
+  # 每块buffer的空间大小,越小的空间被利用越充分,不要设置太大，以免影响其他应用，合适即可
+  #buffer-size: 1024
+  # 是否分配的直接内存
+  #direct-buffers: true
+  # 开启GZIP数据压缩
+  compression:
+    enabled: true
+  # 优雅停机
+  shutdown: graceful
+
+spring:
+  application:
+    name: gateway
+  main:
+    allow-bean-definition-overriding: true
+  lifecycle:
+    # 优雅停机宽限期时间
+    timeout-per-shutdown-phase: 30s
+  jackson:
+    default-property-inclusion: NON_NULL
+    serialization:
+      ORDER_MAP_ENTRIES_BY_KEYS: true
+      WRITE_DATES_AS_TIMESTAMPS: true
+    deserialization:
+      FAIL_ON_UNKNOWN_PROPERTIES: false
+    mapper:
+      SORT_PROPERTIES_ALPHABETICALLY: true
+  cloud:
+    kubernetes:
+      reload:
+        enabled: true
+      config:
+        sources:
+          - namespace: ${kubernetes.namespace}
+            name: application
+          - namespace: ${kubernetes.namespace}
+            name: mongodb
+          - namespace: ${kubernetes.namespace}
+            name: logging
+          - namespace: ${kubernetes.namespace}
+            name: gateway
