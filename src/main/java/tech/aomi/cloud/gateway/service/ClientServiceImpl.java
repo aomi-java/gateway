@@ -3,12 +3,9 @@ package tech.aomi.cloud.gateway.service;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheConfig;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import tech.aomi.cloud.gateway.api.ClientService;
-import tech.aomi.cloud.gateway.constant.CacheKey;
 import tech.aomi.cloud.gateway.dto.CreateClientDto;
 import tech.aomi.cloud.gateway.dto.UpdateClientDto;
 import tech.aomi.cloud.gateway.entity.Client;
@@ -20,20 +17,17 @@ import tech.aomi.common.exception.ResourceNonExistException;
  */
 @Slf4j
 @Service
-@CacheConfig(cacheNames = CacheKey.CLIENT)
 public class ClientServiceImpl implements ClientService {
 
     @Autowired
     private ClientRepository clientRepository;
 
     @Override
-    @Cacheable(key = "#clientId", unless = "#result == null")
     public Client getClient(String clientId) {
         return clientRepository.findById(clientId).orElse(null);
     }
 
     @Override
-    @Cacheable(key = "#result.id", unless = "#result == null")
     public Client getClientByCode(String code) {
         return clientRepository.findByCode(code);
     }
