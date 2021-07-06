@@ -1,14 +1,23 @@
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import tech.aomi.cloud.gateway.controller.RequestMessage;
 import tech.aomi.cloud.gateway.controller.ResponseMessage;
 import tech.aomi.common.constant.Common;
+import tech.aomi.common.utils.MapBuilder;
 import tech.aomi.common.utils.crypto.AesUtils;
 import tech.aomi.common.utils.crypto.RSAUtil;
+import tech.aomi.common.utils.json.Json;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Date;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -28,12 +37,19 @@ public class ClientTest {
         message.setClientId("123");
 
         AesUtils.setTransformation(AesUtils.AES_CBC_PKCS5Padding);
-        AesUtils.setKeyLength(256);
+        AesUtils.setKeyLength(128);
         byte[] key = AesUtils.generateKey();
 
         message.setTrk(RSAUtil.publicKeyEncryptWithBase64(channelPk, key));
         message.setTimestamp(DateFormatUtils.format(new Date(), Common.DATETIME_FORMAT));
         message.setRandomString(UUID.randomUUID().toString().replaceAll("-", ""));
+
+//        Map<String, String> payload = MapBuilder.of(
+//                "auditNumber", "22222222222"
+//        );
+//        String payloadStr = Json.toJson(payload).toString();
+//        byte[] payloadCi = AesUtils.encrypt(key, payloadStr.getBytes(StandardCharsets.UTF_8));
+//        message.setPayload(Base64.getEncoder().encodeToString(payloadCi));
 
         String signData = message.getTimestamp() + message.getRandomString() + StringUtils.trimToEmpty(message.getPayload());
         System.out.println(signData);
@@ -44,9 +60,22 @@ public class ClientTest {
 
         RestTemplate restTemplate = new RestTemplate();
 
-        ResponseMessage res = restTemplate.postForObject("http://localhost/v1", message, ResponseMessage.class);
+        System.out.println(message);
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl("http://localhost/v2/pay/record?a=1")
+                .queryParam("requestId", message.getRequestId())
+                .queryParam("clientId", message.getClientId())
+                .queryParam("trk", URLEncoder.encode(message.getTrk()))
+                .queryParam("timestamp", message.getTimestamp())
+                .queryParam("randomString", message.getRandomString())
+//                .queryParam("payload", URLEncoder.encode(message.getPayload()))
+                .queryParam("sign", URLEncoder.encode(message.getSign()));
+//        ResponseMessage res = restTemplate.getForObject(builder.build().toString(), ResponseMessage.class);
 
-        System.out.println(res);
+        HttpEntity<ResponseMessage> resBody = restTemplate.exchange(builder.build().toString(), HttpMethod.GET,null,ResponseMessage.class);
+
+//        ResponseMessage res = restTemplate.postForObject(builder.build().toString(), message, ResponseMessage.class);
+        System.out.println(resBody.getBody());
+        System.out.println(resBody.getHeaders());
     }
 
 

@@ -38,11 +38,13 @@ public class RequestMessage implements java.io.Serializable {
      * 使用公钥加密后的传输秘钥、Base64编码
      * 请求时,使用服务端的公钥加密
      * 响应时,使用客户端的公钥加密
+     * AES 秘钥、长度128位
      */
     private String trk;
 
     /**
      * 发送请求的时间
+     * 格式: yyyy-MM-dd HH:mm:ss.SSS
      */
     private String timestamp;
 

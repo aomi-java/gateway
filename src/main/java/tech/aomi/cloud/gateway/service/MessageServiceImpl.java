@@ -1,5 +1,6 @@
 package tech.aomi.cloud.gateway.service;
 
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
@@ -10,13 +11,14 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.web.server.ServerWebExchange;
 import tech.aomi.cloud.gateway.api.ClientService;
 import tech.aomi.cloud.gateway.api.MessageService;
+import tech.aomi.cloud.gateway.constant.Common;
 import tech.aomi.cloud.gateway.constant.Header;
 import tech.aomi.cloud.gateway.constant.MessageVersion;
 import tech.aomi.cloud.gateway.controller.RequestMessage;
 import tech.aomi.cloud.gateway.controller.ResponseMessage;
+import tech.aomi.cloud.gateway.controller.SignType;
 import tech.aomi.cloud.gateway.entity.Client;
 import tech.aomi.cloud.gateway.filter.message.MessageContext;
-import tech.aomi.common.constant.Common;
 import tech.aomi.common.exception.ErrorCode;
 import tech.aomi.common.exception.ServiceException;
 import tech.aomi.common.exception.SignatureException;
@@ -26,6 +28,7 @@ import tech.aomi.common.utils.crypto.RSAUtil;
 import tech.aomi.common.utils.json.Json;
 import tech.aomi.common.web.controller.Result;
 
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -44,6 +47,80 @@ public class MessageServiceImpl implements MessageService {
 
     @Autowired
     private ClientService clientService;
+
+    @Override
+    public String requestId() {
+        return UUID.randomUUID().toString().replaceAll("-", "");
+    }
+
+    @Override
+    public String randomString() {
+        return UUID.randomUUID().toString().replaceAll("-", "");
+    }
+
+    @Override
+    public String timestamp() {
+        return DateFormatUtils.format(new Date(), Common.TIMESTAMP_FORMAT);
+    }
+
+    @Override
+    @SneakyThrows
+    public byte[] trk() {
+        return AesUtils.generateKey(Common.AES_KEY_LENGTH);
+    }
+
+    @Override
+    public Charset charset() {
+        return StandardCharsets.UTF_8;
+    }
+
+    @Override
+    public SignType signType() {
+        return SignType.RSA;
+    }
+
+    @Override
+    public byte[] getSignData(RequestMessage body) {
+        String signData = body.getTimestamp() + body.getRandomString() + StringUtils.trimToEmpty(body.getPayload());
+        LOGGER.debug("请求签名数据: [{}]", signData);
+        return signData.getBytes(body.getCharset());
+    }
+
+    @Override
+    public byte[] getSignData(ResponseMessage body) {
+        String signData = body.getTimestamp() + body.getRandomString() + StringUtils.trimToEmpty(body.getPayload());
+        LOGGER.debug("响应签名数据: [{}]", signData);
+        return signData.getBytes(body.getCharset());
+    }
+
+    @Override
+    @SneakyThrows
+    public RequestMessage createRequestMessage(Client client, String payload) {
+
+        byte[] trk = trk();
+        String ciphertextTrk = RSAUtil.publicKeyEncryptWithBase64(client.getClientPublicKey(), trk);
+
+        RequestMessage requestMessage = new RequestMessage();
+        requestMessage.setRequestId(requestId());
+        requestMessage.setClientId(client.getId());
+        requestMessage.setTrk(ciphertextTrk);
+        requestMessage.setTimestamp(timestamp());
+        requestMessage.setRandomString(randomString());
+        requestMessage.setCharset(charset());
+        requestMessage.setSignType(signType());
+
+        if (StringUtils.isNotEmpty(payload)) {
+            byte[] ciphertextPayload = aes(true, trk, payload.getBytes(requestMessage.getCharset()));
+            String ciphertextPayloadStr = Base64.getEncoder().encodeToString(ciphertextPayload);
+            requestMessage.setPayload(ciphertextPayloadStr);
+        }
+        byte[] signData = getSignData(requestMessage);
+        String sign = sign(requestMessage.getSignType(), client.getPrivateKey(), signData);
+        requestMessage.setSign(sign);
+
+        return requestMessage;
+    }
+
 
     @Override
     public void init(MessageContext context, RequestMessage body) {
@@ -94,22 +171,6 @@ public class MessageServiceImpl implements MessageService {
         return headers;
     }
 
-    @Override
-    public void verify(ServerWebExchange exchange, MessageContext context) throws ServiceException {
-        RequestMessage body = context.getRequestMessage();
-        LOGGER.debug("请求参数签名验证: {}", body);
-        String signDataStr = body.getTimestamp() + body.getRandomString() + StringUtils.trimToEmpty(body.getPayload());
-        LOGGER.debug("请求验签数据: [{}], 客户端计算的签名: [{}]", signDataStr, body.getSign());
-        byte[] signData = signDataStr.getBytes();
-        byte[] signBytes = Base64.getDecoder().decode(body.getSign());
-
-        switch (body.getSignType()) {
-            case RSA:
-                rsaSignVerify(context.getClient(), body, signData, signBytes);
-                break;
-        }
-
-    }
 
     @Override
     public byte[] modifyRequestBody(ServerWebExchange exchange, MessageContext context) {
@@ -141,8 +202,8 @@ public class MessageServiceImpl implements MessageService {
     @Override
     public ResponseMessage modifyResponseBody(ServerWebExchange exchange, MessageContext context, Result.Entity body) {
         ResponseMessage message = new ResponseMessage();
-        message.setTimestamp(DateFormatUtils.format(new Date(), Common.DATETIME_FORMAT));
-        message.setRandomString(UUID.randomUUID().toString().replaceAll("-", ""));
+        message.setTimestamp(timestamp());
+        message.setRandomString(randomString());
         message.setSuccess(body.getSuccess());
         message.setStatus(body.getStatus());
 
@@ -162,34 +223,73 @@ public class MessageServiceImpl implements MessageService {
         LOGGER.debug("响应参数签名计算: {}", body);
         body.setSignType(context.getRequestMessage().getSignType());
 
-        String signDataStr = body.getTimestamp() + body.getRandomString() + StringUtils.trimToEmpty(body.getPayload());
-        byte[] signData = signDataStr.getBytes();
+        byte[] signData = getSignData(body);
 
-        String sign = "";
-        switch (body.getSignType()) {
-            case RSA:
-                sign = rsaSign(context, signData);
-                break;
-        }
-        LOGGER.debug("响应签名数据: [{}], 签名: [{}]", signDataStr, sign);
+        Client client = context.getClient();
+        String privateKeyStr = client.getPrivateKey();
+
+        String sign = sign(body.getSignType(), privateKeyStr, signData);
+        LOGGER.debug("签名方式: [{}], 签名: [{}]", body.getSignType(), sign);
         body.setSign(sign);
     }
 
-    private String rsaSign(MessageContext context, byte[] signData) {
-        Client client = context.getClient();
-        String privateKeyStr = client.getPrivateKey();
-        PrivateKey privateKey = null;
+    @Override
+    public String sign(SignType signType, String baseKey, byte[] signData) {
+        String sign = "";
+        switch (signType) {
+            case RSA:
+                sign = rsaSign(baseKey, signData);
+                break;
+        }
+        return sign;
+    }
+
+    @Override
+    public void verify(ServerWebExchange exchange, MessageContext context) throws ServiceException {
+        RequestMessage body = context.getRequestMessage();
+        LOGGER.debug("请求参数签名验证: {}", body);
+        byte[] signData = getSignData(body);
+
+        boolean isOk = false;
+        switch (body.getSignType()) {
+            case RSA:
+                String pk = context.getClient().getClientPublicKey();
+                isOk = rsaVerify(pk, signData, body.getSign());
+                break;
+        }
+        if (isOk) {
+            LOGGER.debug("签名校验通过: RequestId: {}", body.getRequestId());
+            return;
+        }
+        LOGGER.error("签名校验失败: {}", body.getSign());
+        throw new SignatureException("签名校验失败");
+    }
+
+    @Override
+    public boolean verify(SignType signType, String baseKey, byte[] signData, String sign) {
+        boolean isOk = false;
+        switch (signType) {
+            case RSA:
+                isOk = rsaVerify(baseKey, signData, sign);
+                break;
+        }
+        return isOk;
+    }
+
+
+    private String rsaSign(String key, byte[] signData) {
+        PrivateKey privateKey;
         try {
-            privateKey = RSA.parsePrivateKeyWithBase64(privateKeyStr);
+            privateKey = RSA.parsePrivateKeyWithBase64(key);
         } catch (Exception e) {
-            LOGGER.error("解析服务端私钥失败: {}", e.getMessage(), e);
-            throw new ServiceException("解析服务端私钥失败", e);
+            LOGGER.error("解析私钥失败: {}", e.getMessage(), e);
+            throw new ServiceException("解析私钥失败", e);
         }
 
         try {
             byte[] signArr = RSAUtil.sign(
                     privateKey,
-                    tech.aomi.cloud.gateway.constant.Common.RSA_SIGN_ALGORITHM,
+                    Common.RSA_SIGN_ALGORITHM,
                     signData
             );
             return Base64.getEncoder().encodeToString(signArr);
@@ -202,41 +302,29 @@ public class MessageServiceImpl implements MessageService {
     /**
      * RSA 签名验证
      *
-     * @param body      请求参数
-     * @param signData  验签数据
-     * @param signBytes 客户端计算的签名
+     * @return 签名是否正确
      */
-    private void rsaSignVerify(Client client, RequestMessage body, byte[] signData, byte[] signBytes) {
-        String publicKeyStr = client.getClientPublicKey();
-        if (StringUtils.isEmpty(publicKeyStr)) {
-            LOGGER.error("获取客户端公钥失败: {}", body.getClientId());
-            throw new SignatureException("获取客户端公钥失败:" + body.getClientId());
-        }
-
+    private boolean rsaVerify(String publicKeyStr, byte[] signData, String sign) {
         PublicKey publicKey;
         try {
             publicKey = RSA.parsePublicKeyWithBase64(publicKeyStr);
         } catch (Exception e) {
-            throw new SignatureException("客户端公钥格式不正确,无法解析:" + body.getClientId());
+            LOGGER.error("公钥格式不正确,无法解析:" + e.getMessage(), e);
+            return false;
         }
 
         try {
-            boolean isOk = RSAUtil.signVerify(
+            byte[] signBytes = Base64.getDecoder().decode(sign);
+            return RSAUtil.signVerify(
                     publicKey,
-                    tech.aomi.cloud.gateway.constant.Common.RSA_SIGN_ALGORITHM,
+                    Common.RSA_SIGN_ALGORITHM,
                     signData,
                     signBytes
             );
-            if (isOk) {
-                LOGGER.debug("签名校验通过: RequestId: {}", body.getRequestId());
-                return;
-            }
-            LOGGER.error("签名错误:{}", body.getSign());
-            throw new SignatureException("签名错误");
         } catch (Exception e) {
-            LOGGER.error("签名执行失败: {}", e.getMessage());
-            throw new SignatureException("签名校验异常:" + e.getMessage(), e);
+            LOGGER.error("签名执行失败: {}", e.getMessage(), e);
         }
+        return false;
     }
 
     private byte[] aes(boolean encrypt, byte[] key, byte[] data) {

@@ -23,4 +23,8 @@ public class Common {
      */
     public static final String RSA_SIGN_ALGORITHM = RSAUtil.SIGN_ALGORITHMS_SHA512;
 
+    /**
+     * 时间戳格式
+     */
+    public static final String TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS";
 }

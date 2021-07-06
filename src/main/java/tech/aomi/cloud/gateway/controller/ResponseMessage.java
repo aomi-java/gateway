@@ -7,6 +7,8 @@ import org.apache.commons.lang3.time.DateFormatUtils;
 import tech.aomi.common.constant.Common;
 import tech.aomi.common.utils.MapBuilder;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
@@ -48,6 +50,11 @@ public class ResponseMessage implements java.io.Serializable {
      * 根据接口情况判断是否存在该值
      */
     private String payload;
+
+    /**
+     * 请求参数编码格式
+     */
+    private Charset charset = StandardCharsets.UTF_8;
 
     /**
      * 响应结果说明
