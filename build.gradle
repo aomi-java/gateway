@@ -8,7 +8,7 @@ version '1.0.0'
 
 apply from: 'https://onegit.com/enterprise/public/raw/master/java.gradle'
 apply from: 'https://onegit.com/enterprise/public/raw/master/idea.gradle'
-apply from: 'https://onegit.com/enterprise/public/raw/master/bundle-spring-boot-app.gradle'
+apply from: 'https://onegit.com/enterprise/public/raw/master/spring-boot-app-build-image.gradle'
 // 使用spring boot的自动依赖管理
 apply plugin: 'io.spring.dependency-management'
 
