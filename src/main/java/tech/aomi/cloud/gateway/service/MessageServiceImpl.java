@@ -155,6 +155,7 @@ public class MessageServiceImpl implements MessageService {
     public HttpHeaders getRequestHeaders(MessageContext context) {
         HttpHeaders headers = new HttpHeaders();
         setCommonHeader(headers);
+        headers.add(Header.CLIENT_ID, context.getClient().getId());
         if (!CollectionUtils.isEmpty(context.getClient().getRequestHeaders())) {
             context.getClient().getRequestHeaders().forEach(headers::add);
         }

@@ -126,6 +126,7 @@ public class SignGatewayFilter implements GatewayFilter, Ordered {
         HttpHeaders headers = new HttpHeaders();
         headers.putAll(exchange.getRequest().getHeaders());
         headers.add(Header.MESSAGE_VERSION, MessageVersion.V1_0_0.getVersion());
+        headers.add(Header.CLIENT_ID, client.getId());
 
         // the new content type will be computed by bodyInserter
         // and then set in the request decorator
@@ -169,7 +170,10 @@ public class SignGatewayFilter implements GatewayFilter, Ordered {
         }
         return chain.filter(
                 exchange.mutate()
-                        .request(request.mutate().header(Header.MESSAGE_VERSION, MessageVersion.V1_0_0.getVersion()).build())
+                        .request(request.mutate()
+                                .header(Header.MESSAGE_VERSION, MessageVersion.V1_0_0.getVersion())
+                                .header(Header.CLIENT_ID, client.getId())
+                                .build())
                         .response(new SignServerHttpResponse(
                                 exchange,
                                 messageReaders,
