@@ -1,5 +1,6 @@
 package tech.aomi.cloud.gateway.exception;
 
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.web.ErrorProperties;
 import org.springframework.boot.autoconfigure.web.WebProperties;
@@ -9,6 +10,7 @@ import org.springframework.boot.web.reactive.error.ErrorAttributes;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.server.ResponseStatusException;
+import tech.aomi.cloud.gateway.api.MessageService;
 import tech.aomi.cloud.gateway.controller.ResponseMessage;
 import tech.aomi.common.exception.ErrorCode;
 import tech.aomi.common.exception.ServiceException;
@@ -24,10 +26,14 @@ import java.util.Optional;
  * @author Sean createAt 2021/5/8
  */
 @Slf4j
+@Setter
 public class GlobalErrorWebExceptionHandler extends DefaultErrorWebExceptionHandler {
+
+    private MessageService messageService;
 
     public GlobalErrorWebExceptionHandler(ErrorAttributes errorAttributes, WebProperties.Resources resources, ErrorProperties errorProperties, ApplicationContext applicationContext) {
         super(errorAttributes, resources, errorProperties, applicationContext);
+        messageService = applicationContext.getBean(MessageService.class);
     }
 
     @Override
@@ -39,6 +45,9 @@ public class GlobalErrorWebExceptionHandler extends DefaultErrorWebExceptionHand
         }
 
         ResponseMessage responseMessage = new ResponseMessage();
+        responseMessage.setTimestamp(messageService.timestamp());
+        responseMessage.setRandomString(messageService.randomString());
+        responseMessage.setCharset(messageService.charset().name());
         responseMessage.setSuccess(false);
         ServiceException se;
         if (t instanceof ServiceException) {

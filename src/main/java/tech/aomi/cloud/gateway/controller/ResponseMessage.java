@@ -25,6 +25,8 @@ public class ResponseMessage implements java.io.Serializable {
 
     private static final long serialVersionUID = 5435501706637912303L;
 
+    private String requestId;
+
     /**
      * 响应请求的时间
      */
@@ -54,7 +56,7 @@ public class ResponseMessage implements java.io.Serializable {
     /**
      * 请求参数编码格式
      */
-    private Charset charset = StandardCharsets.UTF_8;
+    private String charset;
 
     /**
      * 响应结果说明
@@ -64,7 +66,7 @@ public class ResponseMessage implements java.io.Serializable {
     /**
      * 签名方式
      */
-    private SignType signType = SignType.RSA;
+    private SignType signType;
 
     /**
      * 签名原始数据=发送请求时间+随机字符串+响应状态码+报文数据
@@ -73,11 +75,6 @@ public class ResponseMessage implements java.io.Serializable {
      * 响应时、服务端使用自身秘钥计算签名
      */
     private String sign;
-
-    public ResponseMessage() {
-        this.timestamp = DateFormatUtils.format(new Date(), Common.DATETIME_FORMAT);
-        this.randomString = UUID.randomUUID().toString().replaceAll("-", "");
-    }
 
     public Map<String, Object> toMap() {
         return MapBuilder.<String, Object>builder()
@@ -90,5 +87,12 @@ public class ResponseMessage implements java.io.Serializable {
                 .put("signType", signType)
                 .put("sign", sign)
                 .build();
+    }
+
+    public Charset charset() {
+        if (null == charset) {
+            return StandardCharsets.UTF_8;
+        }
+        return Charset.forName(charset);
     }
 }

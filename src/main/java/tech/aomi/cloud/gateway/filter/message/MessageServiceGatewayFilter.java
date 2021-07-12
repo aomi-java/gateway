@@ -77,8 +77,8 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
         // TODO: flux or mono
         Mono<byte[]> modifiedBody = serverRequest.bodyToMono(RequestMessage.class)
                 .flatMap(body -> {
-                    messageService.init(context, body);
                     try {
+                        messageService.init(context, body);
                         messageService.verify(exchange, context);
                     } catch (Exception e) {
                         LOGGER.error("签名验证失败: {}", e.getMessage());
@@ -91,7 +91,7 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
 
 
         BodyInserter<Mono<byte[]>, ReactiveHttpOutputMessage> bodyInserter = BodyInserters.fromPublisher(modifiedBody, byte[].class);
-        HttpHeaders headers = messageService.getRequestHeaders(context);
+        HttpHeaders headers = new HttpHeaders();
         headers.putAll(exchange.getRequest().getHeaders());
 
         // the new content type will be computed by bodyInserter
@@ -101,7 +101,7 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
         CachedBodyOutputMessage outputMessage = new CachedBodyOutputMessage(exchange, headers);
 
         return bodyInserter.insert(outputMessage, new BodyInserterContext()).then(Mono.defer(() -> {
-            ServerHttpRequest decorator = decorate(exchange, headers, outputMessage);
+            ServerHttpRequest decorator = decorate(exchange, headers, outputMessage, context);
             return chain.filter(
                     exchange.mutate()
                             .request(decorator)
@@ -138,7 +138,7 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
             return Mono.error(e);
         }
         byte[] newBody = messageService.modifyRequestBody(exchange, context);
-        String newBodyStr = new String(newBody, body.getCharset());
+        String newBodyStr = new String(newBody, body.charset());
 
         if (StringUtils.isNotEmpty(newBodyStr)) {
             URI uri = exchange.getRequest().getURI();
@@ -165,7 +165,7 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
         );
     }
 
-    private ServerHttpRequestDecorator decorate(ServerWebExchange exchange, HttpHeaders headers, CachedBodyOutputMessage outputMessage) {
+    private ServerHttpRequestDecorator decorate(ServerWebExchange exchange, HttpHeaders headers, CachedBodyOutputMessage outputMessage, MessageContext context) {
         return new ServerHttpRequestDecorator(exchange.getRequest()) {
             @Override
             public HttpHeaders getHeaders() {
@@ -179,6 +179,7 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
                     // httpbin.org
                     httpHeaders.set(HttpHeaders.TRANSFER_ENCODING, "chunked");
                 }
+                httpHeaders.addAll(messageService.getRequestHeaders(context));
                 return httpHeaders;
             }
 

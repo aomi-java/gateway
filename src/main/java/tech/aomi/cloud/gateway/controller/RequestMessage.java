@@ -64,7 +64,7 @@ public class RequestMessage implements java.io.Serializable {
     /**
      * 请求参数编码格式
      */
-    private Charset charset = StandardCharsets.UTF_8;
+    private String charset;
 
     /**
      * 签名方式
@@ -80,7 +80,7 @@ public class RequestMessage implements java.io.Serializable {
     private String sign;
 
     public RequestMessage(MultiValueMap<String, String> args) {
-        Optional.ofNullable(args.getFirst("charset")).ifPresent(charset -> this.charset = Charset.forName(charset));
+        Optional.ofNullable(args.getFirst("charset")).ifPresent(charset -> this.charset = charset);
         Optional.ofNullable(args.getFirst("requestId")).ifPresent(requestId -> this.requestId = urlDecode(requestId));
         Optional.ofNullable(args.getFirst("clientId")).ifPresent(clientId -> this.clientId = urlDecode(clientId));
         Optional.ofNullable(args.getFirst("trk")).ifPresent(trk -> this.trk = urlDecode(trk));
@@ -93,9 +93,16 @@ public class RequestMessage implements java.io.Serializable {
 
     private String urlDecode(String value) {
         try {
-            return URLDecoder.decode(value, Optional.ofNullable(getCharset()).orElse(StandardCharsets.UTF_8).name());
+            return URLDecoder.decode(value, charset().name());
         } catch (Exception ignored) {
         }
         return value;
+    }
+
+    public Charset charset() {
+        if (null == charset) {
+            return StandardCharsets.UTF_8;
+        }
+        return Charset.forName(charset);
     }
 }

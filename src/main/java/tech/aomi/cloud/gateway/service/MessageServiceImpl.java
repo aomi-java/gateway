@@ -83,14 +83,14 @@ public class MessageServiceImpl implements MessageService {
     public byte[] getSignData(RequestMessage body) {
         String signData = body.getTimestamp() + body.getRandomString() + StringUtils.trimToEmpty(body.getPayload());
         LOGGER.debug("请求签名数据: [{}]", signData);
-        return signData.getBytes(body.getCharset());
+        return signData.getBytes(body.charset());
     }
 
     @Override
     public byte[] getSignData(ResponseMessage body) {
         String signData = body.getTimestamp() + body.getRandomString() + StringUtils.trimToEmpty(body.getPayload());
         LOGGER.debug("响应签名数据: [{}]", signData);
-        return signData.getBytes(body.getCharset());
+        return signData.getBytes(body.charset());
     }
 
     @Override
@@ -106,7 +106,7 @@ public class MessageServiceImpl implements MessageService {
         requestMessage.setTrk(ciphertextTrk);
         requestMessage.setTimestamp(timestamp());
         requestMessage.setRandomString(randomString());
-        requestMessage.setCharset(charset());
+//        requestMessage.setCharset(charset());
         requestMessage.setSignType(signType());
 
         if (StringUtils.isNotEmpty(payload)) {
@@ -202,16 +202,23 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     public ResponseMessage modifyResponseBody(ServerWebExchange exchange, MessageContext context, Result.Entity body) {
+
+        RequestMessage requestMessage = context.getRequestMessage();
+
         ResponseMessage message = new ResponseMessage();
         message.setTimestamp(timestamp());
         message.setRandomString(randomString());
         message.setSuccess(body.getSuccess());
         message.setStatus(body.getStatus());
 
+        message.setRequestId(requestMessage.getRequestId());
+        message.setCharset(requestMessage.getCharset());
+        message.setSignType(requestMessage.getSignType());
+
         if (null != body.getPayload()) {
             String payloadStr = Json.toJson(body.getPayload()).toString();
             LOGGER.debug("加密响应参数: {}", payloadStr);
-            byte[] payload = aes(true, context.getTrk(), payloadStr.getBytes(StandardCharsets.UTF_8));
+            byte[] payload = aes(true, context.getTrk(), payloadStr.getBytes(message.charset()));
             message.setPayload(Base64.getEncoder().encodeToString(payload));
         }
 
