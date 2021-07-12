@@ -84,13 +84,13 @@ public class SignGatewayFilter implements GatewayFilter, Ordered {
             code = merchantCode;
         }
         if (StringUtils.isEmpty(code)) {
-            throw new ResourceNonExistException("客户端不存在: " + code);
+            return Mono.error(new ResourceNonExistException("客户端不存在: " + code));
         }
 
         Client client = clientService.getClientByCode(code);
         if (null == client || StringUtils.isEmpty(client.getClientPublicKey())) {
             LOGGER.error("请求方没有配置密钥信息");
-            throw new ServiceException("请求方没有配置密钥信息");
+            return Mono.error(new ServiceException("请求方没有配置密钥信息"));
         }
         exchange.getAttributes().put("client", client);
 
