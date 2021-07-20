@@ -321,6 +321,7 @@ public class MessageServiceImpl implements MessageService {
             return false;
         }
 
+        LOGGER.debug("待验证的签名: [{}]", sign);
         try {
             byte[] signBytes = Base64.getDecoder().decode(sign);
             return RSAUtil.signVerify(
