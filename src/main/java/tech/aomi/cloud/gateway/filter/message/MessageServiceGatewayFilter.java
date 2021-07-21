@@ -87,7 +87,7 @@ public class MessageServiceGatewayFilter implements GatewayFilter, Ordered {
                     context.setRequestMessage(body);
                     byte[] newBody = messageService.modifyRequestBody(exchange, context);
                     return Mono.just(newBody);
-                });
+                }).switchIfEmpty(Mono.error(new IllegalArgumentException("Required request body is missing")));
 
 
         BodyInserter<Mono<byte[]>, ReactiveHttpOutputMessage> bodyInserter = BodyInserters.fromPublisher(modifiedBody, byte[].class);
