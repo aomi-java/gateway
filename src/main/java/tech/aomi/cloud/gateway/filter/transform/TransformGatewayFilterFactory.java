@@ -120,7 +120,6 @@ public class TransformGatewayFilterFactory extends AbstractGatewayFilterFactory<
         if (method == HttpMethod.GET) {
             String payload = Json.toJson(queryParams).toString();
             RequestMessage body = messageService.createRequestMessage(client, payload);
-            uriBuilder.queryParam("requestId", body.getRequestId());
             uriBuilder.queryParam("clientId", body.getClientId());
             uriBuilder.queryParam("trk", body.getTrk());
             uriBuilder.queryParam("timestamp", body.getTimestamp());

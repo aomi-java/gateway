@@ -25,11 +25,6 @@ public class RequestMessage implements java.io.Serializable {
     private static final long serialVersionUID = -6173282298420535916L;
 
     /**
-     * 请求唯一标识
-     */
-    private String requestId;
-
-    /**
      * 分配给客户端的唯一ID
      */
     private String clientId;
@@ -81,7 +76,6 @@ public class RequestMessage implements java.io.Serializable {
 
     public RequestMessage(MultiValueMap<String, String> args) {
         Optional.ofNullable(args.getFirst("charset")).ifPresent(charset -> this.charset = charset);
-        Optional.ofNullable(args.getFirst("requestId")).ifPresent(requestId -> this.requestId = urlDecode(requestId));
         Optional.ofNullable(args.getFirst("clientId")).ifPresent(clientId -> this.clientId = urlDecode(clientId));
         Optional.ofNullable(args.getFirst("trk")).ifPresent(trk -> this.trk = urlDecode(trk));
         Optional.ofNullable(args.getFirst("timestamp")).ifPresent(timestamp -> this.timestamp = urlDecode(timestamp));

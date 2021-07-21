@@ -101,7 +101,6 @@ public class MessageServiceImpl implements MessageService {
         String ciphertextTrk = RSAUtil.publicKeyEncryptWithBase64(client.getClientPublicKey(), trk);
 
         RequestMessage requestMessage = new RequestMessage();
-        requestMessage.setRequestId(requestId());
         requestMessage.setClientId(client.getId());
         requestMessage.setTrk(ciphertextTrk);
         requestMessage.setTimestamp(timestamp());
@@ -212,7 +211,6 @@ public class MessageServiceImpl implements MessageService {
         message.setSuccess(body.getSuccess());
         message.setStatus(body.getStatus());
 
-        message.setRequestId(requestMessage.getRequestId());
         message.setCharset(requestMessage.getCharset());
         message.setSignType(requestMessage.getSignType());
 
@@ -267,7 +265,6 @@ public class MessageServiceImpl implements MessageService {
                 break;
         }
         if (isOk) {
-            LOGGER.debug("签名校验通过: RequestId: {}", body.getRequestId());
             return;
         }
         LOGGER.error("签名校验失败: {}", body.getSign());

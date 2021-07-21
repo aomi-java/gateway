@@ -25,8 +25,6 @@ public class ResponseMessage implements java.io.Serializable {
 
     private static final long serialVersionUID = 5435501706637912303L;
 
-    private String requestId;
-
     /**
      * 响应请求的时间
      */
