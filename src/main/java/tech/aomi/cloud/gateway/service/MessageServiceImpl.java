@@ -177,7 +177,7 @@ public class MessageServiceImpl implements MessageService {
     public byte[] modifyRequestBody(ServerWebExchange exchange, MessageContext context) {
         Client client = context.getClient();
         RequestMessage message = context.getRequestMessage();
-        LOGGER.debug("解密传输秘钥: {}", message.getTrk());
+        LOGGER.debug("解密传输秘钥: [{}]", message.getTrk());
         byte[] trk;
         try {
             trk = RSAUtil.privateKeyDecryptWithBase64(client.getPrivateKey(), message.getTrk());
@@ -190,12 +190,13 @@ public class MessageServiceImpl implements MessageService {
         }
 
         String payloadCiphertext = message.getPayload();
-        LOGGER.debug("解密请求参数: {}", payloadCiphertext);
+        LOGGER.debug("解密请求参数: [{}]", payloadCiphertext);
         if (StringUtils.isEmpty(payloadCiphertext)) {
             LOGGER.info("明文为空,不需要解密");
             return new byte[0];
         }
         byte[] payload = aes(false, trk, Base64.getDecoder().decode(payloadCiphertext));
+        LOGGER.debug("请求参数明文: [{}]", new String(payload, StandardCharsets.UTF_8));
         context.setPayload(payload);
         return payload;
     }
