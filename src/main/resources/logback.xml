@@ -1,0 +1,105 @@
+<configuration>
+    <conversionRule conversionWord="clr" converterClass="org.springframework.boot.logging.logback.ColorConverter"/>
+    <property scope="context" name="logHome" value="${LOG_FOLDER}"/>
+    <property scope="context" name="logName" value="${APP_NAME}"/>
+
+    <!--  access log  -->
+    <appender name="accessLog" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!--日志名称，如果没有File 属性，那么只会使用FileNamePattern的文件路径规则 如果同时有<File>和<FileNamePattern>，那么当天日志是<File>，明天会自动把今天的日志改名为今天的日期。即，<File> 的日志都是当天的。 -->
+        <File>${logHome}/access_log.log</File>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!--文件路径,定义了日志的切分方式——把每一天的日志归档到一个文件中,以防止日志填满整个磁盘空间-->
+            <fileNamePattern>${logHome}/access_log-%d{yyyy-MM-dd}-%i.gz</fileNamePattern>
+            <!--只保留最近30天的日志-->
+            <maxHistory>0</maxHistory>
+            <maxFileSize>30mb</maxFileSize>
+        </rollingPolicy>
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>%msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!--获取配置中的参数信息-->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>
+                [%X{logId}] %clr(%d){cyan} [%clr(%-5level){lightgreen}] [%thread] [%logger{0}] - %msg%n
+            </pattern>
+        </encoder>
+    </appender>
+    <appender name="FILE_INFO" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!--日志名称，如果没有File 属性，那么只会使用FileNamePattern的文件路径规则 如果同时有<File>和<FileNamePattern>，那么当天日志是<File>，明天会自动把今天的日志改名为今天的日期。即，<File> 的日志都是当天的。 -->
+        <File>${logHome}/${logName}.log</File>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!--文件路径,定义了日志的切分方式——把每一天的日志归档到一个文件中,以防止日志填满整个磁盘空间-->
+            <fileNamePattern>${logHome}/${logName}-%d{yyyy-MM-dd}-%i.gz</fileNamePattern>
+            <!--只保留最近30天的日志-->
+            <maxHistory>0</maxHistory>
+            <maxFileSize>30mb</maxFileSize>
+        </rollingPolicy>
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>[%X{logId}] %d [%-5level] [%logger{0}] - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE_ERROR" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!--日志名称，如果没有File 属性，那么只会使用FileNamePattern的文件路径规则 如果同时有<File>和<FileNamePattern>，那么当天日志是<File>，明天会自动把今天的日志改名为今天的日期。即，<File> 的日志都是当天的。 -->
+        <File>${logHome}/${logName}-error.log</File>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!--文件路径,定义了日志的切分方式——把每一天的日志归档到一个文件中,以防止日志填满整个磁盘空间-->
+            <fileNamePattern>${logHome}/${logName}-error-%d{yyyy-MM-dd}-%i.gz</fileNamePattern>
+            <!--只保留最近30天的日志-->
+            <maxHistory>0</maxHistory>
+            <maxFileSize>30mb</maxFileSize>
+        </rollingPolicy>
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>[%X{logId}] %d [%-5level] [%logger{0}] - %msg%n</pattern>
+        </encoder>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+    </appender>
+
+    <appender name="ASYNC_INFO" class="ch.qos.logback.classic.AsyncAppender">
+        <!-- 不丢失日志.默认的,如果队列的80%已满,则会丢弃TRACT、INFO、INFO级别的日志 -->
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>256</queueSize>
+        <appender-ref ref="FILE_INFO"/>
+        <appender-ref ref="accessLog" />
+    </appender>
+
+    <appender name="ASYNC_ERROR" class="ch.qos.logback.classic.AsyncAppender">
+        <!-- 不丢失日志.默认的,如果队列的80%已满,则会丢弃TRACT、INFO、INFO级别的日志 -->
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>256</queueSize>
+        <appender-ref ref="FILE_ERROR"/>
+    </appender>
+
+    　　　　　　　　
+    <logger name="org.springframework" level="INFO" additivity="false">
+        <appender-ref ref="ASYNC_INFO"/>
+        <appender-ref ref="ASYNC_ERROR"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="tech.aomi" level="DEBUG" additivity="false">
+        <appender-ref ref="ASYNC_INFO"/>
+        <appender-ref ref="ASYNC_ERROR"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="reactor.netty.http.server.AccessLog" level="INFO" additivity="false">
+        <appender-ref ref="ASYNC_INFO"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_INFO"/>
+        <appender-ref ref="ASYNC_ERROR"/>
+    </root>
+</configuration>
