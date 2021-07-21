@@ -8,7 +8,7 @@ import org.springframework.boot.autoconfigure.web.reactive.error.DefaultErrorWeb
 import org.springframework.boot.web.error.ErrorAttributeOptions;
 import org.springframework.boot.web.reactive.error.ErrorAttributes;
 import org.springframework.context.ApplicationContext;
-import org.springframework.web.reactive.function.server.ServerRequest;
+import org.springframework.web.reactive.function.server.*;
 import org.springframework.web.server.ResponseStatusException;
 import tech.aomi.cloud.gateway.api.MessageService;
 import tech.aomi.cloud.gateway.controller.ResponseMessage;
@@ -34,6 +34,11 @@ public class GlobalErrorWebExceptionHandler extends DefaultErrorWebExceptionHand
     public GlobalErrorWebExceptionHandler(ErrorAttributes errorAttributes, WebProperties.Resources resources, ErrorProperties errorProperties, ApplicationContext applicationContext) {
         super(errorAttributes, resources, errorProperties, applicationContext);
         messageService = applicationContext.getBean(MessageService.class);
+    }
+
+    @Override
+    protected RouterFunction<ServerResponse> getRoutingFunction(ErrorAttributes errorAttributes) {
+        return RouterFunctions.route(RequestPredicates.all(), this::renderErrorResponse);
     }
 
     @Override
@@ -74,10 +79,12 @@ public class GlobalErrorWebExceptionHandler extends DefaultErrorWebExceptionHand
         return resultMap;
     }
 
+
+
     /**
      * 根据code获取对应的HttpStatus
      *
-     * @param errorAttributes
+     * @param errorAttributes errorAttributes
      */
     @Override
     protected int getHttpStatus(Map<String, Object> errorAttributes) {
