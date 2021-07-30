@@ -34,7 +34,10 @@ public class ClientServiceImpl implements ClientService {
 
     @Override
     public Client save(CreateClientDto dto) {
-        Client client = new Client();
+        Client client = clientRepository.findByCode(dto.getCode());
+        if (null == client) {
+            client = new Client();
+        }
         client.setCode(dto.getCode());
         client.setName(dto.getName());
         client.setRequestHeaders(dto.getRequestHeaders());
