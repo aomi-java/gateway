@@ -137,6 +137,10 @@ public class MessageServiceImpl implements MessageService {
 
         Client client = clientService.getClient(body.getClientId());
         if (null == client) {
+            LOGGER.debug("使用id作为code获取client: {}", body.getClientId());
+            client = clientService.getClientByCode(body.getClientId());
+        }
+        if (null == client) {
             LOGGER.error("客户端没有配置秘钥相关信息: {}", body.getClientId());
             throw new ServiceException("客户端没有配置秘钥相关信息: " + body.getClientId());
         }
