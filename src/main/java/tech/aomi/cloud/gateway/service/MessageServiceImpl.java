@@ -105,7 +105,7 @@ public class MessageServiceImpl implements MessageService {
         requestMessage.setTrk(ciphertextTrk);
         requestMessage.setTimestamp(timestamp());
         requestMessage.setRandomString(randomString());
-//        requestMessage.setCharset(charset());
+        requestMessage.setCharset(charset().name());
         requestMessage.setSignType(signType());
 
         if (StringUtils.isNotEmpty(payload)) {
