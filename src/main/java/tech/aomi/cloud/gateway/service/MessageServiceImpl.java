@@ -7,6 +7,7 @@ import org.apache.commons.lang3.time.DateFormatUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.server.ServerWebExchange;
 import tech.aomi.cloud.gateway.api.ClientService;
@@ -123,17 +124,11 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     public void init(MessageContext context, RequestMessage body) {
-        if (StringUtils.isAnyEmpty(
-                body.getClientId(),
-                body.getTrk(),
-                body.getTimestamp(),
-                body.getRandomString(),
-                body.getSign())) {
-
-            ServiceException e = new ServiceException("请求参数不正确,必填参数有NULL值. 请检查: clientId、trk、timestamp、randomString、sign是否已经正确填写");
-            e.setErrorCode(ErrorCode.PARAMS_ERROR);
-            throw e;
-        }
+        Assert.hasLength(body.getClientId(), "ClientId 不能为空");
+        Assert.hasLength(body.getTrk(), "trk 不能为空");
+        Assert.hasLength(body.getTimestamp(), "timestamp 不能为空");
+        Assert.hasLength(body.getRandomString(), "randomString 不能为空");
+        Assert.hasLength(body.getSign(), "sign 不能为空");
 
         Client client = clientService.getClient(body.getClientId());
         if (null == client) {
