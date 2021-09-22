@@ -11,6 +11,7 @@ import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ReactiveHttpOutputMessage;
 import org.springframework.http.codec.HttpMessageReader;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -73,7 +74,11 @@ public class MessageServiceServerHttpResponse extends ServerHttpResponseDecorato
         ServerHttpResponse response = exchange.getResponse();
         HttpStatus httpStatus = response.getStatusCode();
 
-        if (null == httpStatus || !httpStatus.is2xxSuccessful() || httpStatus.is3xxRedirection()) {
+        if (null == httpStatus ||
+                !httpStatus.is2xxSuccessful() ||
+                httpStatus.is3xxRedirection() ||
+                response.getHeaders().containsValue(MediaType.APPLICATION_OCTET_STREAM_VALUE)
+        ) {
             return super.writeWith(body);
         }
 
