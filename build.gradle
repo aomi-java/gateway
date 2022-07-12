@@ -1,12 +1,12 @@
 plugins {
     id "io.franzbecker.gradle-lombok" version "2.2"
-    id 'org.springframework.boot' version '2.4.6' apply false
+    id "org.springframework.boot" version "2.7.1" apply false
 }
 
 group 'tech.aomi.cloud'
 version '1.0.0'
 
-apply from: 'https://onegit.com/enterprise/public/raw/master/java.gradle'
+apply from: 'https://onegit.com/enterprise/public/raw/master/java17.gradle'
 apply from: 'https://onegit.com/enterprise/public/raw/master/idea.gradle'
 apply from: 'https://onegit.com/enterprise/public/raw/master/spring-libraries.gradle'
 
@@ -23,14 +23,16 @@ test {
 }
 
 repositories {
-    maven { url "${project.'repo.url'}" }
     mavenCentral()
+    maven {
+        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+    }
 }
 
 dependencyManagement {
     imports {
-        mavenBom "org.springframework.boot:spring-boot-dependencies:2.4.6"
-        mavenBom "org.springframework.cloud:spring-cloud-dependencies:2020.0.3"
+        mavenBom "org.springframework.boot:spring-boot-dependencies:2.7.1"
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:2021.0.3"
     }
 }
 
@@ -43,9 +45,9 @@ dependencies {
 
     implementation 'org.apache.commons:commons-lang3:3.5'
 
-    implementation 'tech.aomi.common:web:1.0.5-Alpha.2'
-    implementation 'tech.aomi.common:exception:1.0.0'
-    implementation 'tech.aomi.common:utils:1.0.9'
+    implementation 'tech.aomi.common:web:1.0.5_10-SNAPSHOT'
+    implementation 'tech.aomi.common:exception:1.0.1-SNAPSHOT'
+    implementation 'tech.aomi.common:utils:1.0.13_0-SNAPSHOT'
 
     testImplementation "org.springframework.boot:spring-boot-starter-test"
 }
