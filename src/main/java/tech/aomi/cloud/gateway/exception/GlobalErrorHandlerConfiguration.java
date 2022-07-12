@@ -28,11 +28,12 @@ public class GlobalErrorHandlerConfiguration {
     @Bean
     @Order(-1)
     public ErrorWebExceptionHandler errorWebExceptionHandler(ErrorAttributes errorAttributes,
-                                                             WebProperties.Resources resourceProperties,
                                                              WebProperties webProperties,
                                                              ObjectProvider<ViewResolver> viewResolvers,
                                                              ServerCodecConfigurer serverCodecConfigurer,
                                                              ApplicationContext applicationContext) {
+        WebProperties.Resources resourceProperties = webProperties.getResources();
+
         GlobalErrorWebExceptionHandler exceptionHandler = new GlobalErrorWebExceptionHandler(errorAttributes,
                 resourceProperties.hasBeenCustomized() ? resourceProperties : webProperties.getResources(),
                 this.serverProperties.getError(), applicationContext);
