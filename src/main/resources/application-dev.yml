@@ -13,14 +13,14 @@ spring:
           filters:
             - "Transform"
         - id: v2
-          uri: https://api-xfb.easipay.net/v1
+          uri: https://xxx/v1
           predicates:
             - Path=/v2/**
           filters:
             - "MessageService"
             - RewritePath=/v2(?<segment>/?.*), /v1$\{segment}
         - id: v1
-          uri: https://api-xfb.easipay.net/v1
+          uri: https://xxx/v1
           predicates:
             - Path=/v1/**
           filters:
@@ -30,10 +30,10 @@ spring:
     mongodb:
       host: 127.0.0.1
       port: 27017
-      username: dev
-      password: dev.com
-      database: pay
-      authentication-database: pay
+      username: xxx
+      password: xxx
+      database: xxx
+      authentication-database: xxx
 
 logging:
   level:
